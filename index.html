@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="en">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta charset="utf-8">
+<title>WorldInSights</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sedgwick+Ave+Display&family=Young+Serif&family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Cormorant+Garamond:ital,wght@1,500&family=Bagel+Fat+One&family=Caveat:wght@600&family=Figtree:wght@400;500&display=swap">
+<style>
+/* Layout: the Gallery wall. A row of product windows floats at eye level; the name and conviction are centered (below, above or behind the wall, chosen in Settings). */
+:root {
+  --wall-top: #ebe9e4;
+  --wall-bottom: #dcd9d1;
+  --paper: #fbfaf6;
+  --ink: #2a2926;
+  --muted: #74706a;
+  --panel: #fbfaf6;
+  --line: rgba(42, 41, 38, .14);
+  --shadow: 40, 28, 16;
+  --font-title: "Sedgwick Ave Display", "Caveat", cursive;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+body { background: linear-gradient(var(--wall-top), var(--wall-bottom)) fixed; background-color: var(--wall-bottom); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.55; transition: background-color .4s; }
+a { color: inherit; }
+button, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+[hidden] { display: none !important; }
+.page { min-height: 100%; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); }
+.page > * { min-width: 0; }
+.pad { padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+@media (min-width: 900px) { .pad { padding-left: max(64px, env(safe-area-inset-left, 0px)); padding-right: max(64px, env(safe-area-inset-right, 0px)); } }
+
+nav { position: relative; z-index: 4; display: flex; align-items: center; justify-content: space-between; padding-block: 24px; font-size: 14px; font-weight: 500; color: var(--muted); }
+nav .links { display: flex; align-items: center; gap: 22px; }
+nav a { text-decoration: none; }
+nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
+.gear { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: transparent; cursor: pointer; color: var(--muted); }
+.gear:hover { color: var(--ink); border-color: var(--muted); }
+
+/* the wall */
+.wall { display: flex; gap: clamp(20px, 3vw, 40px); overflow-x: auto; overscroll-behavior-x: contain; padding-block: 28px 56px; scrollbar-width: none; cursor: grab; align-items: flex-start; }
+.wall::-webkit-scrollbar { display: none; }
+.wall.dragging { cursor: grabbing; scroll-snap-type: none; }
+/* equal spacers at both ends: the row centers when it fits and scrolls edge to edge when it doesn't */
+.wall::before, .wall::after { content: ""; flex: 0 0 1px; }
+.wall::before { margin-left: auto; }
+.wall::after { margin-right: auto; }
+.float { flex: 0 0 auto; animation: drift 5.2s ease-in-out infinite; animation-delay: calc(var(--i) * -0.7s); transition: opacity .7s ease, filter .7s ease; outline: none; }
+@keyframes drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.card { position: relative; width: clamp(108px, min(17vw, 29vh), 236px); aspect-ratio: 3 / 4; border-radius: 12px; background: var(--paper); box-shadow: 0 16px 28px rgba(var(--shadow), .17), 0 2px 4px rgba(var(--shadow), .06); transition: opacity .55s ease, transform .7s cubic-bezier(.22, .9, .24, 1), box-shadow .55s; overflow: hidden; }
+.card canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.float:focus-visible .card { box-shadow: 0 0 0 2px var(--ink), 0 16px 28px rgba(var(--shadow), .17); }
+
+/* hover: the product steps out of its window into a faint sketch of where it lives */
+#home { position: relative; overflow-x: clip; display: flex; flex-direction: column; justify-content: center; }
+#env { position: absolute; top: -120px; left: 0; width: 100%; height: calc(100% + 120px); pointer-events: none; z-index: 0; opacity: 0;
+  -webkit-mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 30%), #000 var(--rev), transparent calc(var(--rev) + 220px));
+          mask-image: radial-gradient(circle at var(--mx, 50%) var(--my, 30%), #000 var(--rev), transparent calc(var(--rev) + 220px));
+  transition: opacity .5s ease .05s, --rev .9s cubic-bezier(.4, 0, .2, 1); }
+#env.show { opacity: 1; --rev: 1500px; transition: opacity .7s ease .1s, --rev 1.6s cubic-bezier(.25, .7, .2, 1) .1s; }
+@property --rev { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.wall { position: relative; z-index: 1; }
+.wall.focus .float { animation-play-state: paused; }
+.wall.focus .float:not(.on) { opacity: .55; }
+.wall.focus .float:not(.on) .card { transform: translateX(var(--push, 0px)); transition: transform .9s cubic-bezier(.22, .9, .24, 1), opacity .55s ease, box-shadow .55s; }
+#home:has(.wall.focus) #title { opacity: .2; }
+#home:has(.wall.focus) .placard:not(.echoing) #line { opacity: .3; }
+.float.on .card { opacity: 0; transform: scale(.92); box-shadow: none; }
+.lift { position: absolute; z-index: 3; pointer-events: none; transform-origin: 50% 50%; transition: filter 1s ease; filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0)); will-change: transform; }
+.lift.up { filter: drop-shadow(0 22px 20px rgba(var(--shadow), .13)); }
+.lift.back { transition: filter .6s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .float { animation: none; }
+  .card, .float, .lift, .lift.back, #env, #env.show { transition-duration: .01s !important; transition-delay: 0s !important; }
+}
+
+.placard { position: relative; z-index: 2; padding-block: 4px 56px; display: grid; gap: 14px; justify-items: center; text-align: center; }
+#title { transition: opacity .7s ease; white-space: nowrap; }
+/* wordmark: "World" a touch darker than "InSights" so the two words read apart */
+#title .w-world { color: color-mix(in oklab, var(--ink) 88%, var(--muted)); }
+#title .w-in, #title .w-sights { color: var(--muted); }
+.lines { display: grid; justify-items: center; }
+.lines > p { grid-area: 1 / 1; transition: opacity .6s ease, transform .6s ease; }
+.echo { opacity: 0; transform: translateY(8px); font-family: var(--font-title); font-weight: var(--title-weight, 400); font-style: var(--title-style, normal); font-size: clamp(22px, 2.4vw, 34px) !important; line-height: 1.2; color: var(--ink); }
+.placard.echoing #line { opacity: 0; transform: translateY(-8px); }
+.placard.echoing .echo { opacity: 1; transform: none; }
+.stage { position: relative; }
+.slot-top { text-align: center; padding-block: 0 4px; }
+.slot-top h1 { font-size: clamp(48px, 7.5vw, 104px); }
+.slot-back { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; overflow: hidden; }
+.slot-back h1 { font-size: clamp(72px, 12.5vw, 240px); line-height: 1; }
+.ch { display: inline-block; transition: transform .35s cubic-bezier(.2, .8, .2, 1); }
+.ink .ch { animation: inkIn 1s cubic-bezier(.2, .8, .2, 1) backwards; animation-delay: calc(var(--k) * 65ms + 150ms); }
+.ink-line { animation: fadeUp 1s ease backwards; animation-delay: 1.2s; }
+.no-title .ink-line { animation-delay: .4s; }
+.no-title .placard { padding-top: 12px; }
+.no-title .lines > p { font-size: clamp(17px, 1.6vw, 21px); max-width: 62ch; }
+.no-title #line > span { display: block; }
+@keyframes inkIn { from { opacity: 0; transform: translateY(.2em) rotate(-5deg); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ink .ch, .ink-line { animation: none; } .ch { transition: none; } }
+.seg.three { grid-template-columns: repeat(3, 1fr); }
+.checks { display: grid; gap: 8px; font-size: 14px; }
+.checks label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.checks input { margin-top: 3px; accent-color: var(--ink); }
+h1 { font-family: var(--font-title); font-weight: var(--title-weight, 400); font-style: var(--title-style, normal); font-size: clamp(54px, min(9vw, 15vh), 120px); line-height: .95; margin: 0; letter-spacing: var(--title-track, 0); }
+.placard p { margin: 0; max-width: 34em; font-size: clamp(16px, 1.4vw, 19px); text-wrap: balance; }
+.placard p span { color: var(--muted); }
+
+/* about */
+.about { padding-block: 24px 72px; display: grid; gap: 32px; max-width: 1040px; margin-inline: auto; width: 100%; box-sizing: border-box; justify-items: center; text-align: center; }
+.about h1 { font-size: clamp(48px, 7vw, 96px); }
+.about .lead { font-size: clamp(17px, 1.6vw, 21px); max-width: 40em; width: 100%; margin: 0; text-wrap: balance; }
+.about .lead span { display: block; color: var(--muted); }
+.founders { display: grid; grid-template-columns: repeat(3, minmax(0, min(220px, 34vh))); justify-content: center; gap: clamp(14px, 4vw, 56px); margin: 16px 0 0; padding: 0; list-style: none; width: 100%; }
+.founders li { display: grid; gap: 4px; justify-items: center; animation: drift 5.2s ease-in-out infinite; animation-delay: calc(var(--i) * -1.4s); }
+.founders .card { width: 100%; margin-bottom: 14px; }
+.founders b { font-weight: 500; font-size: clamp(14px, 3.6vw, 18px); line-height: 1.25; text-align: center; }
+.founders span { color: var(--muted); font-size: clamp(12px, 3vw, 14px); }
+/* short screens (a phone held sideways): tighter spacing so the wall, name and line fit in one view */
+@media (max-height: 520px) {
+  nav { padding-block: 12px; }
+  .wall { padding-block: 14px 26px; }
+  .placard { gap: 8px; padding-bottom: 20px; }
+  .about { padding-block: 8px 32px; gap: 16px; }
+  .about h1 { font-size: clamp(36px, 10vh, 64px); }
+  .founders .card { margin-bottom: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .founders li { animation: none; } }
+footer { padding-block: 0 24px; font-size: 13px; color: var(--muted); }
+
+/* settings */
+.settings { position: fixed; top: calc(72px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: min(320px, calc(100vw - 32px)); background: var(--panel); color: var(--ink); border-radius: 14px; box-shadow: 0 24px 60px rgba(var(--shadow), .25); padding: 20px; display: grid; gap: 18px; z-index: 20; max-height: calc(100vh - 96px); overflow-y: auto; }
+.settings h2 { margin: 0; font-size: 15px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+.settings h2 button { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 20px; line-height: 1; padding: 2px 6px; }
+.field { display: grid; gap: 8px; }
+.field > span { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.field select { padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg label { position: relative; }
+.seg input { position: absolute; opacity: 0; inset: 0; }
+.seg label > span { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; cursor: pointer; background: var(--paper); }
+.seg input:checked + span, .seg label > input:checked + span { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.seg input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+.dots { display: flex; gap: 3px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; }
+.font-preview { font-size: 30px; line-height: 1.1; padding: 4px 0 0; }
+</style>
+
+<div class="page">
+  <nav class="pad">
+    <a href="#" id="nav-home">Worlds</a>
+    <div class="links">
+      <a href="#about" id="nav-about">About</a>
+      <button class="gear" id="gear" type="button" aria-label="Settings" aria-expanded="false" aria-controls="settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <main id="home">
+    <canvas id="env" aria-hidden="true"></canvas>
+    <div class="slot-top pad" id="slotTop"></div>
+    <div class="stage">
+      <div class="slot-back" id="slotBack"></div>
+      <section class="wall pad" id="wall" aria-label="Product worlds"></section>
+    </div>
+    <section class="placard pad" id="placard">
+      <div id="slotBelow"><h1 id="title" aria-label="WorldInSights">WorldInSights</h1></div>
+      <div class="lines">
+        <p id="line">Every shopping question deserves a world of its own. <span>We turn products into living worlds that shoppers can explore, ask, and understand.</span></p>
+        <p id="echo" class="echo" aria-live="polite"></p>
+      </div>
+    </section>
+  </main>
+
+  <main id="about" class="about pad" hidden>
+    <h1>About</h1>
+    <p class="lead">We make technology that adapts to how people think and shop. <span>Our founding team comes from Adobe, Autodesk, Microsoft, NVIDIA, and UC San Diego.</span></p>
+    <ul class="founders" id="founders"></ul>
+  </main>
+
+  <footer class="pad">© 2026 WorldInSights</footer>
+</div>
+
+<div class="settings" id="settings" role="dialog" aria-label="Settings" hidden>
+  <h2>Settings <button type="button" id="close" aria-label="Close settings">×</button></h2>
+  <label class="field"><span>Title font</span>
+    <select id="font"></select>
+    <div class="font-preview" id="preview">WorldInSights</div>
+  </label>
+  <div class="field"><span>Colors</span><div class="seg" id="theme"></div></div>
+  <div class="field"><span>Drawing</span><div class="seg" id="hand"></div></div>
+  <div class="field"><span>Title position</span><div class="seg three" id="layout"></div></div>
+  <div class="field"><span>Text effects</span>
+    <div class="checks">
+      <label><input type="checkbox" id="fx-ink"> <span>Ink in on load: letters write themselves in, then the sentence fades up</span></label>
+      <label><input type="checkbox" id="fx-follow"> <span>Letters follow the cursor: nearby letters lift and tilt a little</span></label>
+      <label><input type="checkbox" id="fx-echo"> <span>Echo the open world: the sentence becomes that product's shopper question</span></label>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- options ---------- */
+const FONTS = [
+  { id: 'sedgwick', name: 'Sedgwick Ave Display', css: '"Sedgwick Ave Display", cursive', weight: 400, style: 'normal' },
+  { id: 'young', name: 'Young Serif', css: '"Young Serif", serif', weight: 400, style: 'normal' },
+  { id: 'bricolage', name: 'Bricolage Grotesque', css: '"Bricolage Grotesque", sans-serif', weight: 700, style: 'normal', track: '-.02em' },
+  { id: 'cormorant', name: 'Cormorant Garamond italic', css: '"Cormorant Garamond", serif', weight: 500, style: 'italic' },
+  { id: 'bagel', name: 'Bagel Fat One', css: '"Bagel Fat One", sans-serif', weight: 400, style: 'normal' },
+  { id: 'caveat', name: 'Caveat', css: '"Caveat", cursive', weight: 600, style: 'normal' },
+];
+const THEMES = {
+  graphite: { name: 'Graphite & wash', wall: ['#ebe9e4', '#dcd9d1'], paper: '#fbfaf6', ink: '#2a2926', muted: '#74706a', panel: '#fbfaf6', shadow: '40, 28, 16', key: '#2b2b2b',
+              inks: ['#e8a27c', '#9fb7c4', '#d9c08a', '#a9b89b', '#d6a6a8', '#b9a9cc'] },
+  kraft:    { name: 'Kraft & pastel', wall: ['#dcc8a8', '#c9b08b'], paper: '#f0e5d1', ink: '#1f1a14', muted: '#5f5141', panel: '#f3e9d8', shadow: '60, 38, 14', key: '#1f1a14',
+              inks: ['#d6392b', '#2e5fb7', '#f0b429', '#3e8a4f', '#e98aa0', '#8a6bb8'] },
+};
+const HAND_NAMES = { pencil: 'Pencil & wash', crayon: 'Oil pastel' };
+const DEFAULTS = { font: 'sedgwick', theme: 'graphite', hand: 'pencil', layout: 'below', ink: true, follow: false, echo: true };
+let S = { ...DEFAULTS };
+try { const saved = JSON.parse(localStorage.getItem('wi-settings') || '{}'); S = { ...S, ...saved }; } catch (e) {}
+const save = () => { try { localStorage.setItem('wi-settings', JSON.stringify(S)); } catch (e) {} };
+
+/* ---------- products: plain shapes in a 0..1 box, drawn by hand ----------
+   c = ink index (0 warm, 1 blue, 2 gold, 3 green, 4 rose, 5 lilac), 'k' = pencil/key line, soft = faint fill */
+const chain = Array.from({ length: 29 }, (_, i) => { const a = -1.25 + 2.5 * i / 28; return [.5 + .165 * Math.sin(a) / Math.sin(1.25), .2 + .42 * (Math.cos(a) - Math.cos(1.25)) / (1 - Math.cos(1.25))]; });
+const PRODUCTS = [
+  /* shapes: the product (lifts out on hover); stay: drawn on the window's paper and fades with it;
+     lift: where the product settles (scale, offset as a share of the card); env: the faint setting it lands in, in the same coordinates */
+  { id: 'lamp', q: 'How warm is 2700K?', label: 'Pendant lamp', lift: { s: 1.3, dx: 0, dy: -.06 }, shapes: [
+    { t: 'l', pts: [[.5, -.02], [.5, .25]], c: 'k' },
+    { t: 'r', x0: .465, y0: .2, x1: .535, y1: .26, f: 1, c: 'k' },
+    { t: 'p', pts: [[.42, .25], [.58, .25], [.76, .45], [.24, .45]], f: 1, c: 0 },
+    { t: 'e', x: .5, y: .45, rx: .26, ry: .028, f: 1, c: 2 },
+    { t: 'c', x: .5, y: .475, r: .045, f: 1, c: 2 },
+  ], env: [
+    { t: 'l', pts: [[.5, -.02], [.5, -3]], c: 'k' },
+    { t: 'e', x: .5, y: 1.3, rx: .8, ry: .05, f: 1, c: 2, soft: 1 },
+    { t: 'a', x0: -.62, x1: -.16, top: .86, bot: 1.31, c: 'k' },
+    { t: 'a', x0: 1.16, x1: 1.62, top: .86, bot: 1.31, c: 'k' },
+    { t: 'l', pts: [[-1.1, 1.31], [2.1, 1.31]], c: 'k' },
+    { t: 'l', pts: [[-1.1, 1.36], [2.1, 1.36]], c: 'k' },
+    { t: 'l', pts: [[-.9, 1.36], [-.9, 2.3]], c: 'k' },
+    { t: 'l', pts: [[1.9, 1.36], [1.9, 2.3]], c: 'k' },
+    { t: 'r', x0: 1.18, y0: 1.1, x1: 1.3, y1: 1.31, f: 1, c: 3, soft: 1 },
+    { t: 'l', pts: [[-4, 2.3], [5, 2.3]], c: 'k' },
+  ] },
+  { id: 'necklace', q: 'Will it snag my sweater?', label: 'Necklace', lift: { s: 1.2, dx: 0, dy: .04 }, shapes: [
+    { t: 'l', pts: chain, c: 'k' },
+    ...chain.filter((_, i) => i % 2 === 0 && i > 0 && i < 28).map(([x, y]) => ({ t: 'c', x, y, r: .017, f: 1, c: 2 })),
+    { t: 'c', x: .5, y: .64, r: .014, f: 1, c: 2 },
+    { t: 'd', x: .5, top: .64, cy: .74, r: .055, f: 1, c: 1 },
+  ], env: [
+    { t: 'e', x: .5, y: -.72, rx: .27, ry: .36, c: 'k' },
+    { t: 'l', pts: [[.38, -.44], [.37, .19]], c: 'k' },
+    { t: 'l', pts: [[.62, -.44], [.63, .19]], c: 'k' },
+    { t: 'l', pts: [[.37, .19], [.1, .29], [-.35, .42], [-.6, .75]], c: 'k' },
+    { t: 'l', pts: [[.63, .19], [.9, .29], [1.35, .42], [1.6, .75]], c: 'k' },
+    { t: 'l', pts: [[.16, .34], [.42, .29]], c: 'k' },
+    { t: 'l', pts: [[.58, .29], [.84, .34]], c: 'k' },
+    { t: 'l', pts: [[-.35, .66], [.15, .96], [.5, 1.02], [.85, .96], [1.35, .66]], c: 'k' },
+  ] },
+  { id: 'dress', q: 'Does linen wrinkle?', label: 'Dress', lift: { s: 1.15, dx: 0, dy: .04 }, shapes: [
+    { t: 'p', pts: [[.41, .19], [.59, .19], [.63, .31], [.58, .46], [.8, .94], [.2, .94], [.42, .46], [.37, .31]], f: 1, c: 4 },
+    { t: 'l', pts: [[.42, .46], [.58, .46]], c: 'k' },
+    { t: 'l', pts: [[.46, .56], [.38, .92]], c: 'k' },
+    { t: 'l', pts: [[.54, .56], [.62, .92]], c: 'k' },
+    { t: 'l', pts: [[.5, .13], [.29, .2], [.71, .2], [.5, .13]], c: 'k', w: 1.4, stay: 1 },
+    { t: 'l', pts: [[.5, .13], [.5, .09], [.53, .06], [.56, .08]], c: 'k', stay: 1 },
+  ], env: [
+    { t: 'a', x0: -.4, x1: 1.4, top: -.32, bot: 1.27, c: 'k' },
+    { t: 'c', x: .5, y: .07, r: .07, f: 1, c: 5, soft: 1 },
+    { t: 'c', x: .5, y: .085, r: .06, c: 'k' },
+    { t: 'l', pts: [[.475, .128], [.475, .19]], c: 'k' },
+    { t: 'l', pts: [[.525, .128], [.525, .19]], c: 'k' },
+    { t: 'l', pts: [[.405, .21], [.36, .34], [.345, .5], [.335, .6]], c: 'k' },
+    { t: 'l', pts: [[.595, .21], [.64, .34], [.655, .5], [.665, .6]], c: 'k' },
+    { t: 'l', pts: [[.45, .94], [.45, 1.23], [.42, 1.26]], c: 'k' },
+    { t: 'l', pts: [[.55, .94], [.55, 1.23], [.58, 1.26]], c: 'k' },
+    { t: 'l', pts: [[-1.6, 1.27], [2.6, 1.27]], c: 'k' },
+  ] },
+  { id: 'groceries', q: 'Is it ripe by Sunday?', label: 'Groceries', lift: { s: 1.15, dx: 0, dy: .02 }, shapes: [
+    { t: 'e', x: .39, y: .32, rx: .06, ry: .22, rot: -.3, f: 1, c: 0 },
+    { t: 'e', x: .65, y: .29, rx: .035, ry: .1, rot: .45, f: 1, c: 3 },
+    { t: 'e', x: .7, y: .34, rx: .03, ry: .09, rot: 1, f: 1, c: 3 },
+    { t: 'c', x: .55, y: .45, r: .1, f: 1, c: 4 },
+    { t: 'l', pts: [[.55, .36], [.57, .31]], c: 'k' },
+    { t: 'p', pts: [[.24, .48], [.76, .48], [.72, .95], [.28, .95]], f: 1, c: 2 },
+    { t: 'l', pts: [[.25, .55], [.75, .55]], c: 'k' },
+  ], env: [
+    { t: 'l', pts: [[-2.8, .96], [3.8, .96]], c: 'k' },
+    { t: 'l', pts: [[-2.8, 1.02], [3.8, 1.02]], c: 'k' },
+    { t: 'r', x0: 1.25, y0: .7, x1: 1.5, y1: .96, f: 1, c: 1, soft: 1 },
+    { t: 'r', x0: 1.23, y0: .65, x1: 1.52, y1: .71, c: 'k' },
+    { t: 'r', x0: -.58, y0: .76, x1: -.32, y1: .96, f: 1, c: 0, soft: 1 },
+    { t: 'e', x: -.5, y: .63, rx: .04, ry: .1, rot: -.35, f: 1, c: 3, soft: 1 },
+    { t: 'e', x: -.4, y: .61, rx: .04, ry: .1, rot: .4, f: 1, c: 3, soft: 1 },
+  ] },
+  { id: 'chair', q: 'Will it fit my reading nook?', label: 'Armchair', lift: { s: 1.2, dx: 0, dy: .02 }, shapes: [
+    { t: 'l', pts: [[.05, .88], [.95, .88]], c: 'k', stay: 1 },
+    { t: 'a', x0: .28, x1: .72, top: .18, bot: .62, f: 1, c: 1 },
+    { t: 'r', x0: .24, y0: .56, x1: .76, y1: .72, f: 1, c: 1 },
+    { t: 'a', x0: .16, x1: .31, top: .43, bot: .74, f: 1, c: 1 },
+    { t: 'a', x0: .69, x1: .84, top: .43, bot: .74, f: 1, c: 1 },
+    { t: 'l', pts: [[.31, .6], [.69, .6]], c: 'k' },
+    { t: 'l', pts: [[.25, .74], [.23, .87]], c: 'k' },
+    { t: 'l', pts: [[.75, .74], [.77, .87]], c: 'k' },
+  ], env: [
+    { t: 'e', x: .5, y: .93, rx: 1, ry: .07, f: 1, c: 4, soft: 1 },
+    { t: 'l', pts: [[-3, .88], [4, .88]], c: 'k' },
+    { t: 'r', x0: .24, y0: -.4, x1: .76, y1: -.06, c: 'k' },
+    { t: 'r', x0: .3, y0: -.35, x1: .7, y1: -.11, f: 1, c: 3, soft: 1 },
+    { t: 'e', x: -.55, y: .52, rx: .19, ry: .03, c: 'k' },
+    { t: 'l', pts: [[-.55, .54], [-.55, .88]], c: 'k' },
+    { t: 'r', x0: -.63, y0: .38, x1: -.47, y1: .51, f: 1, c: 0, soft: 1 },
+    { t: 'e', x: -.6, y: .28, rx: .03, ry: .08, rot: -.4, f: 1, c: 3, soft: 1 },
+    { t: 'e', x: -.5, y: .27, rx: .03, ry: .08, rot: .4, f: 1, c: 3, soft: 1 },
+    { t: 'l', pts: [[1.55, .88], [1.55, -.05]], c: 'k' },
+    { t: 'p', pts: [[1.45, -.26], [1.65, -.26], [1.73, -.05], [1.37, -.05]], f: 1, c: 2, soft: 1 },
+    { t: 'p', pts: [[1.45, -.26], [1.65, -.26], [1.73, -.05], [1.37, -.05]], c: 'k' },
+    { t: 'e', x: 1.55, y: .88, rx: .1, ry: .015, c: 'k' },
+  ] },
+  { id: 'serum', q: 'Is it good for dry skin?', label: 'Serum bottle', lift: { s: 1.2, dx: 0, dy: 0 }, shapes: [
+    { t: 'a', x0: .44, x1: .56, top: .16, bot: .37, f: 1, c: 0 },
+    { t: 'r', x0: .43, y0: .35, x1: .57, y1: .44, f: 1, c: 2 },
+    { t: 'r', x0: .35, y0: .44, x1: .65, y1: .9, f: 1, c: 3 },
+    { t: 'l', pts: [[.5, .44], [.5, .8]], c: 'k' },
+    { t: 'r', x0: .39, y0: .6, x1: .61, y1: .73, f: 1, c: 5 },
+    { t: 'd', x: .77, top: .58, cy: .68, r: .035, f: 1, c: 3 },
+    { t: 'l', pts: [[.05, .9], [.95, .9]], c: 'k', stay: 1 },
+  ], env: [
+    { t: 'a', x0: -.55, x1: 1.55, top: -.95, bot: .78, c: 'k' },
+    { t: 'l', pts: [[-1, .9], [2, .9]], c: 'k' },
+    { t: 'l', pts: [[-1, .95], [2, .95]], c: 'k' },
+    { t: 'r', x0: 1.05, y0: .74, x1: 1.3, y1: .9, f: 1, c: 4, soft: 1 },
+    { t: 'e', x: .5, y: 1.4, rx: .95, ry: .1, c: 'k' },
+    { t: 'l', pts: [[-.45, 1.4], [-.28, 1.68], [1.28, 1.68], [1.45, 1.4]], c: 'k' },
+    { t: 'l', pts: [[.5, 1.3], [.5, 1.18], [.64, 1.18]], c: 'k' },
+  ] },
+];
+
+/* ---------- geometry ---------- */
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function densify(pts, closed, step = 6) {
+  const out = [], n = pts.length, segs = closed ? n : n - 1;
+  for (let i = 0; i < segs; i++) { const a = pts[i], b = pts[(i + 1) % n], d = Math.hypot(b[0] - a[0], b[1] - a[1]), k = Math.max(1, Math.ceil(d / step)); for (let j = 0; j < k; j++) out.push([a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k]); }
+  if (!closed) out.push(pts[n - 1]); return out;
+}
+function shapePts(s, A) {
+  const X = u => A.x + u * A.w, Y = v => A.y + v * A.h, R = r => r * A.w;
+  if (s.t === 'c' || s.t === 'e') {
+    const rx = R(s.r ?? s.rx), ry = R(s.r ?? s.ry), rot = s.rot || 0, cx = X(s.x), cy = Y(s.y), n = 64, o = [];
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2, ex = Math.cos(a) * rx, ey = Math.sin(a) * ry; o.push([cx + ex * Math.cos(rot) - ey * Math.sin(rot), cy + ex * Math.sin(rot) + ey * Math.cos(rot)]); }
+    return { pts: o, closed: true };
+  }
+  if (s.t === 'p') return { pts: densify(s.pts.map(([u, v]) => [X(u), Y(v)]), true), closed: true };
+  if (s.t === 'l') return { pts: densify(s.pts.map(([u, v]) => [X(u), Y(v)]), false), closed: false };
+  if (s.t === 'r') {
+    const x0 = X(s.x0), y0 = Y(s.y0), x1 = X(s.x1), y1 = Y(s.y1), rr = Math.min(R(.03), (x1 - x0) / 3, (y1 - y0) / 3), o = [];
+    [[x1 - rr, y0 + rr, -Math.PI / 2], [x1 - rr, y1 - rr, 0], [x0 + rr, y1 - rr, Math.PI / 2], [x0 + rr, y0 + rr, Math.PI]].forEach(([cx, cy, a0]) => { for (let i = 0; i <= 8; i++) { const a = a0 + i / 8 * Math.PI / 2; o.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]); } });
+    return { pts: densify(o, true), closed: true };
+  }
+  if (s.t === 'a') {
+    const X0 = X(s.x0), X1 = X(s.x1), T = Y(s.top), B = Y(s.bot), r = (X1 - X0) / 2, cx = X0 + r, cy = T + r, o = [];
+    densify([[X0, B], [X0, cy]], false).forEach(p => o.push(p));
+    for (let i = 0; i <= 32; i++) { const a = Math.PI + i / 32 * Math.PI; o.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+    densify([[X1, cy], [X1, B], [X0, B]], false).forEach(p => o.push(p)); return { pts: o, closed: true };
+  }
+  if (s.t === 'd') {
+    const x = X(s.x), top = Y(s.top), cy = Y(s.cy), r = R(s.r), o = [], q = (p0, p1, p2, t) => [(1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0], (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1]];
+    for (let i = 0; i < 16; i++) o.push(q([x, top], [x + r * 1.1, cy - r * .9], [x + r, cy], i / 16));
+    for (let i = 0; i <= 24; i++) { const a = i / 24 * Math.PI; o.push([x + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+    for (let i = 1; i < 16; i++) o.push(q([x - r, cy], [x - r * 1.1, cy - r * .9], [x, top], i / 16));
+    return { pts: o, closed: true };
+  }
+}
+function wob(pts, amt, r, closed, passes = 2) {
+  let o = pts.map(([x, y]) => [x + (r() - .5) * 2 * amt, y + (r() - .5) * 2 * amt]);
+  for (let p = 0; p < passes; p++) o = o.map((q, i) => { const n = o.length, a = o[i - 1] ?? (closed ? o[n - 1] : q), b = o[i + 1] ?? (closed ? o[0] : q); return [(a[0] + q[0] + b[0]) / 3, (a[1] + q[1] + b[1]) / 3]; });
+  return o;
+}
+function trace(c, pts, closed) { c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]); if (closed) c.closePath(); }
+function bbox(pts) { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; pts.forEach(([x, y]) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }); return { x0, y0, x1, y1 }; }
+
+/* ---------- the two hands (am = overall opacity, used to keep settings faint) ---------- */
+function texLine(c, pts, col, lw, r, alpha = 1) {
+  c.fillStyle = col;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[i + 1], n = Math.max(1, Math.hypot(bx - ax, by - ay) / 1.8);
+    for (let j = 0; j < n; j++) { if (r() < .14) continue; const t = j / n, s = lw * (.45 + r() * .6); c.globalAlpha = (.3 + r() * .6) * alpha; c.fillRect(ax + (bx - ax) * t + (r() - .5) * lw * .7 - s / 2, ay + (by - ay) * t + (r() - .5) * lw * .7 - s / 2, s, s * (.6 + r() * .6)); }
+  }
+  c.globalAlpha = 1;
+}
+const HANDS = {
+  pencil: {
+    fill(c, pts, col, r, T, soft, am = 1) {
+      c.globalCompositeOperation = 'multiply'; c.fillStyle = col;
+      for (let p = 0; p < 3; p++) { c.globalAlpha = (soft ? .12 : .32) * am; c.beginPath(); trace(c, wob(pts, 7, r, true), true); c.fill(); }
+      c.globalCompositeOperation = 'source-over';
+      if (!soft) { c.strokeStyle = T.key; c.lineWidth = 1.3; for (let p = 0; p < 2; p++) { c.globalAlpha = .68 * am; c.beginPath(); trace(c, wob(pts, 1.7, r, true), true); c.stroke(); } }
+      c.globalAlpha = 1;
+    },
+    stroke(c, pts, col, closed, r, T, w, am = 1) {
+      c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = col; c.lineWidth = 1.3 * w;
+      for (let p = 0; p < 2; p++) { c.globalAlpha = .72 * am; c.beginPath(); trace(c, wob(pts, 1.4, r, closed), closed); c.stroke(); }
+      c.globalAlpha = 1;
+    },
+  },
+  crayon: {
+    fill(c, pts, col, r, T, soft, am = 1) {
+      const wp = wob(pts, 2, r, true), b = bbox(wp), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, D = Math.hypot(b.x1 - b.x0, b.y1 - b.y0) / 2 + 4, a = -.75 + r() * .5, dx = Math.cos(a), dy = Math.sin(a);
+      c.save(); c.beginPath(); trace(c, wp, true); c.clip();
+      for (let d = -D; d <= D; d += soft ? 7 : 4.6) texLine(c, [[cx - dy * d - dx * D, cy + dx * d - dy * D], [cx - dy * d + dx * D, cy + dx * d + dy * D]], col, 3.4, r, (soft ? .4 : 1) * am);
+      c.restore(); if (!soft) texLine(c, [...wp, wp[0]], col, 3.6, r, am);
+    },
+    stroke(c, pts, col, closed, r, T, w, am = 1) { const wp = wob(pts, 1.5, r, closed); texLine(c, closed ? [...wp, wp[0]] : wp, col, (S.hand === 'crayon' && am < 1 ? 2.4 : 3.6) * w, r, am); },
+  },
+};
+function drawShapes(c, shapes, A, r, am = 1) {
+  const T = THEMES[S.theme], H = HANDS[S.hand];
+  shapes.forEach(s => {
+    const { pts, closed } = shapePts(s, A), col = s.c === 'k' ? T.key : T.inks[s.c];
+    if (s.f) H.fill(c, pts, col, r, T, s.soft, am); else H.stroke(c, pts, col, closed, r, T, s.w || 1, am);
+  });
+}
+
+/* ---------- a window: paper layer + product layer (no text, just the product) ---------- */
+const CW = 420, CH = 560, ART = { x: 34, y: 40, w: CW - 68, h: CH - 80 };
+/* ---------- demos: a hand-drawn cursor plays with each product inside its window ----------
+   Each product is split into parts (shape indices, in draw order). Every part is pre-drawn once per color variant,
+   so frames only move pre-drawn pieces: no re-sketching, no shimmer. Times are seconds within the loop. */
+const K = keys => t => {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 0; i < keys.length - 1; i++) { const [t0, v0] = keys[i], [t1, v1] = keys[i + 1]; if (t < t1) { const u = (t - t0) / (t1 - t0), e = u * u * (3 - 2 * u); return v0 + (v1 - v0) * e; } }
+  return keys[keys.length - 1][1];
+};
+const STEP = keys => t => { let v = keys[0][1]; for (const [k, val] of keys) if (t >= k) v = val; return v; };
+const path = pts => ({ x: K(pts.map(([t, x]) => [t, x])), y: K(pts.map(([t, , y]) => [t, y])) });
+const OFF = [1.3, 1.2], TAU = Math.PI * 2;
+
+const DEMOS = [
+  { // lamp
+    pivot: [.5, -.02], parts: [{ n: 'cord', idx: [0] }, { n: 'cap', idx: [1] }, { n: 'shade', idx: [2, 3] }, { n: 'bulb', idx: [4] }],
+    variants: [{}, { 0: 1 }, { 0: 3 }],
+    idle: t => ({ rot: .022 * Math.sin(t * 1.25) }),
+    moves: [
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .64, .36], [2.1, .64, .36], [2.7, ...OFF]]), v: STEP([[0, 0], [.7, 1], [1.3, 2], [1.9, 0]]), clicks: [.7, 1.3, 1.9], downs: [] },
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .5, .47], [2.1, .5, .47], [2.7, ...OFF]]), att: K([[.55, 0], [.6, 1], [1.9, 1], [2, 0]]), anchor: [.5, .47],
+        rot: K([[.6, 0], [.95, .2], [1.3, -.14], [1.65, .06], [1.95, 0]]), clicks: [], downs: [[.55, 1.95]] },
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .62, .38], [2.1, .62, .38], [2.7, ...OFF]]), ex: K([[.6, 0], [1, 1], [1.6, 1], [2, 0]]), clicks: [.55], downs: [],
+        part(n, t, d) { const e = d.ex(t); return n === 'cap' ? { dy: -.08 * e } : n === 'bulb' ? { dy: .17 * e, s: 1 + .3 * e } : n === 'shade' ? { dy: .03 * e } : {}; } },
+    ],
+  },
+  { // necklace
+    pivot: [.5, .2], parts: [{ n: 'chain', idx: [...Array(15).keys()] }, { n: 'pendant', idx: [15] }],
+    variants: [{}, { 2: '#b9bec6', 1: 3 }, { 2: '#e0a189', 1: 4 }],
+    idle: t => ({ rot: .03 * Math.sin(t * 1.05) }),
+    moves: [
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .5, .74], [2.1, .5, .74], [2.7, ...OFF]]), att: K([[.55, 0], [.6, 1], [1.95, 1], [2, 0]]), anchor: [.5, .74],
+        rot: K([[.6, 0], [.95, .14], [1.3, -.1], [1.65, .05], [1.95, 0]]), clicks: [], downs: [[.55, 2]] },
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .62, .45], [2.1, .62, .45], [2.7, ...OFF]]), v: STEP([[0, 0], [.7, 1], [1.3, 2], [1.9, 0]]), clicks: [.7, 1.3, 1.9], downs: [] },
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .52, .72], [2.1, .52, .72], [2.7, ...OFF]]), z: K([[.6, 0], [1, 1], [1.7, 1], [2.1, 0]]), clicks: [.55], downs: [],
+        part(n, t, d) { const z = d.z(t); return n === 'pendant' ? { s: 1 + 1.1 * z } : { a: 1 - .75 * z }; } },
+    ],
+  },
+  { // dress
+    pivot: [.5, .55], parts: [{ n: 'dress', idx: [0, 1, 2, 3] }],
+    variants: [{}, { 4: 1 }, { 4: 5 }, { 4: 3 }],
+    idle: t => ({ rot: .012 * Math.sin(t * .9) }),
+    moves: [
+      { D: 2.8, cur: path([[0, ...OFF], [.5, .6, .62], [2.3, .6, .62], [2.8, ...OFF]]), v: STEP([[0, 0], [.7, 1], [1.2, 2], [1.7, 3], [2.2, 0]]), clicks: [.7, 1.2, 1.7, 2.2], downs: [] },
+      { D: 2.6, cur: path([[0, ...OFF], [.45, .72, .6], [1.75, .28, .6], [2.6, ...OFF]]), spin: K([[.5, 0], [1.75, TAU]]), clicks: [.45], downs: [[.45, 1.75]] },
+    ],
+  },
+  { // groceries
+    pivot: [.5, .7], parts: [{ n: 'bread', idx: [0] }, { n: 'leaves', idx: [1, 2] }, { n: 'apple', idx: [3, 4] }, { n: 'bag', idx: [5, 6] }],
+    variants: [{}, { 4: 3 }, { 4: '#e9b44c' }],
+    idle: t => ({ part: n => n === 'leaves' ? { r: .05 * Math.sin(t * 1.6) } : n === 'bread' ? { r: -.015 * Math.sin(t * 1.1) } : null }),
+    moves: [
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .5, .75], [2.1, .5, .75], [2.7, ...OFF]]), ex: K([[.6, 0], [1.1, 1], [1.7, 1], [2.1, 0]]), clicks: [.55], downs: [],
+        part(n, t, d) { const e = d.ex(t); return n === 'bread' ? { dx: -.2 * e, dy: -.12 * e, r: -.45 * e } : n === 'leaves' ? { dx: .2 * e, dy: -.16 * e, r: .3 * e } : n === 'apple' ? { dx: .02 * e, dy: -.25 * e } : {}; } },
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .5, .75], [2.1, .5, .75], [2.7, ...OFF]]), att: K([[.55, 0], [.6, 1], [1.9, 1], [2, 0]]), anchor: [.5, .75],
+        mx: K([[.6, 0], [1, -.14], [1.5, .12], [1.95, 0]]), clicks: [], downs: [[.55, 2]] },
+      { D: 2.8, cur: path([[0, ...OFF], [.5, .53, .48], [.95, .54, .25], [2.2, .54, .25], [2.8, ...OFF]]), up: K([[.55, 0], [.95, 1], [1.9, 1], [2.3, 0]]),
+        v: STEP([[0, 0], [1.1, 1], [1.6, 2], [2.1, 0]]), clicks: [.55, 1.1, 1.6, 2.1], downs: [],
+        part(n, t, d) { return n === 'apple' ? { dx: .02 * d.up(t), dy: -.25 * d.up(t) } : {}; } },
+    ],
+  },
+  { // armchair
+    pivot: [.5, .6], parts: [{ n: 'back', idx: [1] }, { n: 'seat', idx: [2, 5] }, { n: 'armL', idx: [3] }, { n: 'armR', idx: [4] }, { n: 'legs', idx: [6, 7] }],
+    variants: [{}, { 1: 4 }, { 1: 3 }],
+    idle: t => ({ part: n => n === 'seat' ? { dy: -.004 * (1 + Math.sin(t * 1.2)) } : n === 'back' ? { dy: -.004 * (1 + Math.sin(t * 1.2 - .5)) } : null }),
+    moves: [
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .55, .64], [2.1, .55, .64], [2.7, ...OFF]]), v: STEP([[0, 0], [.7, 1], [1.3, 2], [1.9, 0]]), clicks: [.7, 1.3, 1.9], downs: [] },
+      { D: 2.8, cur: path([[0, ...OFF], [.5, .5, .4], [2.2, .5, .4], [2.8, ...OFF]]), ex: K([[.6, 0], [1.1, 1], [1.7, 1], [2.2, 0]]), clicks: [.55], downs: [],
+        part(n, t, d) { const e = d.ex(t); return n === 'back' ? { dy: -.15 * e } : n === 'armL' ? { dx: -.17 * e } : n === 'armR' ? { dx: .17 * e } : n === 'legs' ? { dy: .1 * e } : {}; } },
+      { D: 2.6, cur: path([[0, ...OFF], [.45, .78, .5], [1.8, .25, .5], [2.6, ...OFF]]), spin: K([[.5, 0], [1.8, TAU]]), clicks: [.45], downs: [[.45, 1.8]] },
+    ],
+  },
+  { // serum
+    pivot: [.5, .9], parts: [{ n: 'bulb', idx: [0] }, { n: 'collar', idx: [1] }, { n: 'body', idx: [2, 4] }, { n: 'pipette', idx: [3] }, { n: 'drop', idx: [5] }],
+    variants: [{}, { 3: 1 }, { 3: 4 }],
+    idle: t => ({ part: n => n === 'drop' ? { s: 1 + .1 * Math.sin(t * 1.7), dy: .004 * (1 + Math.sin(t * 1.7)) } : null }),
+    moves: [
+      { D: 2.6, cur: path([[0, ...OFF], [.5, .5, .7], [2, .5, .7], [2.6, ...OFF]]), ex: K([[.6, 0], [1, 1], [1.6, 1], [2, 0]]), clicks: [.55], downs: [],
+        part(n, t, d) { const e = d.ex(t); return n === 'bulb' || n === 'pipette' ? { dy: -.22 * e } : n === 'collar' ? { dy: -.1 * e } : {}; } },
+      { D: 2.7, cur: path([[0, ...OFF], [.5, .55, .78], [2.1, .55, .78], [2.7, ...OFF]]), v: STEP([[0, 0], [.7, 1], [1.3, 2], [1.9, 0]]), clicks: [.7, 1.3, 1.9], downs: [] },
+      { D: 2.8, cur: path([[0, ...OFF], [.5, .5, .26], [2.2, .5, .26], [2.8, ...OFF]]), att: K([[.55, 0], [.6, 1], [2, 1], [2.1, 0]]), anchor: [.5, .26],
+        rot: K([[.6, 0], [1, -.24], [1.5, -.24], [1.95, 0]]), fall: K([[1, 0], [1.5, .14]]), fade: K([[1.3, 1], [1.6, 0], [2.1, 0], [2.5, 1]]), clicks: [], downs: [[.55, 2.05]],
+        part(n, t, d) { return n === 'drop' ? { dy: d.fall(t), a: d.fade(t) } : {}; } },
+    ],
+  },
+];
+
+/* pre-drawn parts, keyed by product, part and the variant colors that part actually uses */
+let partCache = {}, cursorImg = null;
+const PX = u => ART.x + u * ART.w, PY = v => ART.y + v * ART.h;
+function colorFor(c, map, T) { if (c === 'k') return T.key; const m = map[c]; return m === undefined ? T.inks[c] : typeof m === 'number' ? T.inks[m] : m; }
+function partImage(i, p, vi) {
+  const P = PRODUCTS[i], D = DEMOS[i], map = D.variants[vi] || {}, objShapes = P.shapes;
+  const used = Object.keys(map).filter(k => p.idx.some(j => String(objShapes[j].c) === k));
+  const key = `${i}|${p.n}|${used.length ? vi : 0}`;
+  if (partCache[key]) return partCache[key];
+  const T = THEMES[S.theme], H = HANDS[S.hand], cv = document.createElement('canvas'); cv.width = CW; cv.height = CH;
+  const c = cv.getContext('2d'); let b = { x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 };
+  p.idx.forEach(j => {
+    const s = objShapes[j], r = rng(i * 977 + j * 101 + (S.hand === 'pencil' ? 11 : 29)), { pts, closed } = shapePts(s, ART), col = colorFor(s.c, map, T);
+    if (s.f) H.fill(c, pts, col, r, T, s.soft); else H.stroke(c, pts, col, closed, r, T, s.w || 1);
+    const bb = bbox(pts); b = { x0: Math.min(b.x0, bb.x0), y0: Math.min(b.y0, bb.y0), x1: Math.max(b.x1, bb.x1), y1: Math.max(b.y1, bb.y1) };
+  });
+  return (partCache[key] = { cv, cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2 });
+}
+function makeCursor() {
+  const T = THEMES[S.theme], cv = document.createElement('canvas'); cv.width = 64; cv.height = 72; const c = cv.getContext('2d');
+  const pts = densify([[6, 4], [6, 46], [17, 36], [25, 54], [33, 50], [25, 33], [40, 33]], true, 4);
+  c.fillStyle = T.paper; c.beginPath(); trace(c, pts, true); c.fill();
+  HANDS.pencil.stroke(c, pts, T.key, true, rng(5), T, 1.6);
+  return cv;
+}
+
+function renderDemo(i, t = 0, M = null, amp = 0, tt = 0) {
+  const B = DEMOS[i], o = layers[i].obj.getContext('2d'), idl = amp > .002 ? B.idle(tt) : null;
+  o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, CW, CH);
+  const rot = (M?.rot ? M.rot(t) : 0) + (idl?.rot || 0) * amp, sx = M?.spin ? Math.cos(M.spin(t)) : 1;
+  const mx = M?.mx ? M.mx(t) : 0, my = M?.my ? M.my(t) : 0, vi = M?.v ? M.v(t) : 0;
+  const px = PX(B.pivot[0]), py = PY(B.pivot[1]), gx = px + mx * ART.w, gy = py + my * ART.h;
+  o.save(); o.translate(gx, gy); o.rotate(rot); o.scale(Math.abs(sx) < .04 ? .04 * Math.sign(sx || 1) : sx, 1); o.translate(-px, -py);
+  B.parts.forEach(p => {
+    const img = partImage(i, p, vi), q = M?.part ? M.part(p.n, t, M) : {}, w = idl?.part ? idl.part(p.n) || {} : {};
+    const dx = (q.dx || 0) + (w.dx || 0) * amp, dy = (q.dy || 0) + (w.dy || 0) * amp, r = (q.r || 0) + (w.r || 0) * amp, s = (q.s || 1) * (1 + ((w.s || 1) - 1) * amp);
+    o.save(); o.globalAlpha = q.a ?? 1; o.translate(dx * ART.w, dy * ART.h);
+    if (s !== 1 || r) { o.translate(img.cx, img.cy); o.rotate(r); o.scale(s, s); o.translate(-img.cx, -img.cy); }
+    o.drawImage(img.cv, 0, 0); o.restore();
+  });
+  o.restore();
+  if (!M || M.noCursor) return;
+  /* cursor: free path, or riding along with the product while dragging */
+  let cx = PX(M.cur.x(t)), cy = PY(M.cur.y(t));
+  const a = M.att ? M.att(t) : 0;
+  if (a > 0) {
+    const ax = PX(M.anchor[0]) - px, ay = PY(M.anchor[1]) - py;
+    const tx = gx + Math.cos(rot) * ax * sx - Math.sin(rot) * ay, ty = gy + Math.sin(rot) * ax * sx + Math.cos(rot) * ay;
+    cx += (tx - cx) * a; cy += (ty - cy) * a;
+  }
+  const down = M.downs.some(([a0, a1]) => t >= a0 && t <= a1) || M.clicks.some(k => t >= k && t < k + .16);
+  M.clicks.forEach(k => { const u = (t - k) / .5; if (u >= 0 && u < 1) { o.beginPath(); o.arc(cx, cy, 8 + 30 * u, 0, TAU); o.strokeStyle = THEMES[S.theme].key; o.globalAlpha = .45 * (1 - u); o.lineWidth = 2; o.stroke(); o.globalAlpha = 1; } });
+  const inside = t > .05 && t < M.D - .05;
+  if (inside && cursorImg) { const sc = down ? .86 : 1; o.save(); o.translate(cx, cy); o.scale(sc, sc); o.shadowColor = 'rgba(0,0,0,.18)'; o.shadowBlur = 6; o.shadowOffsetY = 3; o.drawImage(cursorImg, -6, -4); o.restore(); }
+}
+
+function drawCard(i) {
+  const P = PRODUCTS[i], T = THEMES[S.theme], seed = i * 977 + (S.hand === 'pencil' ? 11 : 29);
+  const pc = layers[i].paper, oc = layers[i].obj;
+  pc.width = oc.width = CW; pc.height = oc.height = CH;
+  const p = pc.getContext('2d'), r = rng(seed);
+  p.fillStyle = T.paper; p.fillRect(0, 0, CW, CH);
+  drawShapes(p, P.shapes.filter(s => s.stay), ART, r);
+  for (let k = 0; k < 9000; k++) { p.fillStyle = r() > .5 ? 'rgba(0,0,0,.045)' : 'rgba(255,255,255,.1)'; p.fillRect(r() * CW, r() * CH, 1, 1); }
+  renderDemo(i, 0);
+}
+
+/* Choreography, built for short attention spans:
+   1. ripple: on load every visible window hops once with a flash of color, left to right, so the whole wall reads as alive;
+   2. relay: short single-action moves (~2.7 s); the next starts while the current one lets go, so at most two cursors are out;
+   3. the window nearest the visitor's pointer jumps the queue;
+   4. between turns every product keeps a faint idle motion (sway, rustle, breath).
+   Everything pauses while a product is lifted out, the tab is hidden, or the visitor prefers reduced motion. */
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const RIPPLE = { D: 1, noCursor: true, my: K([[0, 0], [.22, -.045], [.48, .01], [.7, 0]]), rot: K([[0, 0], [.22, .035], [.48, -.015], [.75, 0]]), v: STEP([[0, 0], [.16, 1], [.62, 0]]) };
+const run = PRODUCTS.map(() => null), amp = PRODUCTS.map(() => 0), moveNo = PRODUCTS.map(() => 0), endedAt = PRODUCTS.map(() => -1e9);
+const sched = { t0: 0, relayAt: 0, next: 0, last: -1, seenNear: -1, pending: -1, prev: 0 };
+let ptrAt = -1e9;
+function restCard(i) { run[i] = null; amp[i] = 0; renderDemo(i, 0); }
+function resetDemos() { run.fill(null); sched.relayAt = Math.max(sched.relayAt, performance.now() + 900); }
+function visibleCard(i) { const r = layers[i].card.getBoundingClientRect(); return r.right > 0 && r.left < window.innerWidth && r.bottom > 0 && r.top < window.innerHeight; }
+function startMove(i, now) { const ms = DEMOS[i].moves; run[i] = { M: ms[moveNo[i]++ % ms.length], t0: now }; sched.last = i; sched.next = (i + 1) % DEMOS.length; }
+const free = (i, now) => !run[i] && visibleCard(i) && now - endedAt[i] > 900;
+function nearestCard() {
+  if (!ptr) return -1; let best = -1, bd = 1e9;
+  layers.forEach((L, i) => { const r = L.card.getBoundingClientRect(), d = Math.hypot(ptr.x - (r.left + r.width / 2), ptr.y - (r.top + r.height / 2)); if (d < bd && d < r.width * 1.15) { bd = d; best = i; } });
+  return best;
+}
+function pickNext(now) {
+  const n = DEMOS.length;
+  for (let k = 0; k < n; k++) { const j = (sched.next + k) % n; if (j !== sched.last && free(j, now)) return j; }
+  return sched.last >= 0 && free(sched.last, now) ? sched.last : -1;
+}
+function tick(now) {
+  requestAnimationFrame(tick);
+  if (REDUCED || document.hidden || home.hidden) return;
+  if (active >= 0) { run.forEach((r, i) => { if (r) restCard(i); }); sched.prev = now; return; }
+  if (!sched.t0) {
+    sched.t0 = now; let k = 0;
+    DEMOS.forEach((_, i) => { if (visibleCard(i)) run[i] = { M: RIPPLE, t0: now + 450 + 150 * k++ }; });
+    sched.relayAt = now + 450 + 150 * k + 900;
+  }
+  /* who plays next */
+  const near = ptr && now - ptrAt < 2500 ? nearestCard() : -1;
+  if (near !== sched.seenNear) { sched.seenNear = near; sched.pending = near; }
+  const busy = run.map((r, i) => r && r.M !== RIPPLE && now >= r.t0 ? i : -1).filter(i => i >= 0);
+  if (now >= sched.relayAt && busy.length < 2) {
+    if (sched.pending >= 0 && free(sched.pending, now)) { startMove(sched.pending, now); sched.pending = -1; }
+    else if (!busy.length || (busy.length === 1 && (now - run[busy[0]].t0) / 1000 >= run[busy[0]].M.D * .7)) { const j = pickNext(now); if (j >= 0) startMove(j, now); }
+  }
+  /* draw */
+  const dt = Math.min(.05, (now - (sched.prev || now)) / 1000); sched.prev = now;
+  DEMOS.forEach((_, i) => {
+    if (!visibleCard(i)) return;
+    let r = run[i]; const t = r ? (now - r.t0) / 1000 : -1;
+    if (r && t >= r.M.D) { run[i] = r = null; endedAt[i] = now; }
+    const moving = r && t >= 0;
+    amp[i] += ((moving ? 0 : 1) - amp[i]) * Math.min(1, dt * 2.5);
+    renderDemo(i, moving ? t : 0, moving ? r.M : null, amp[i], now / 1000 + i * 1.7);
+  });
+}
+
+/* ---------- founders: a few lines each, drawn with the same hands as the products ---------- */
+const FOUNDERS = [
+  { name: 'Rubaiat Habib', shapes: [
+    { t: 'c', x: .5, y: .42, r: .34, f: 1, c: 0, soft: 1 },
+    { t: 'p', pts: [[.35, .7], [.12, .8], [.03, 1.02], [.97, 1.02], [.88, .8], [.65, .7], [.5, .77]], f: 1, c: 'k', soft: 1 },
+    { t: 'l', pts: [[.35, .7], [.12, .8], [.03, 1.02]], c: 'k' },
+    { t: 'l', pts: [[.65, .7], [.88, .8], [.97, 1.02]], c: 'k' },
+    { t: 'l', pts: [[.08, .88], [.3, .86], [.42, .9]], c: 'k' },
+    { t: 'l', pts: [[.58, .9], [.7, .86], [.92, .88]], c: 'k' },
+    { t: 'l', pts: [[.5, .77], [.5, 1.02]], c: 'k' },
+    { t: 'l', pts: [[.28, .48], [.26, .63], [.36, .72]], c: 'k' },
+    { t: 'l', pts: [[.72, .48], [.74, .63], [.64, .72]], c: 'k' },
+    { t: 'p', pts: [[.28, .48], [.26, .63], [.36, .72], [.5, .77], [.64, .72], [.74, .63], [.72, .48], [.65, .6], [.5, .66], [.35, .6]], f: 1, c: 'k', soft: 1 },
+    { t: 'p', pts: [[.31, .47], [.35, .57], [.5, .64], [.65, .57], [.69, .47], [.6, .53], [.5, .51], [.4, .53]], f: 1, c: 'k', soft: 1 },
+    { t: 'l', pts: [[.3, .33], [.31, .48], [.38, .58], [.5, .64], [.62, .58], [.69, .48], [.7, .33]], c: 'k' },
+    { t: 'a', x0: .29, x1: .71, top: .13, bot: .31, f: 1, c: 'k' },
+    { t: 'l', pts: [[.27, .31], [.6, .3], [.82, .34]], c: 'k', w: 1.5 },
+    { t: 'r', x0: .33, y0: .37, x1: .47, y1: .44, c: 'k', w: 1.5 },
+    { t: 'r', x0: .53, y0: .37, x1: .67, y1: .44, c: 'k', w: 1.5 },
+    { t: 'l', pts: [[.47, .395], [.53, .395]], c: 'k' },
+    { t: 'p', pts: [[.42, .53], [.5, .54], [.58, .53], [.55, .56], [.5, .57], [.45, .56]], f: 1, c: 'k', soft: 1 },
+    { t: 'p', pts: [[.42, .53], [.5, .54], [.58, .53], [.55, .56], [.5, .57], [.45, .56]], c: 'k', w: 1.2 },
+  ] },
+  { name: 'Li-Yi Wei', shapes: [
+    { t: 'c', x: .5, y: .42, r: .34, f: 1, c: 3, soft: 1 },
+    { t: 'p', pts: [[.38, .72], [.14, .8], [.05, 1.02], [.95, 1.02], [.86, .8], [.62, .72]], f: 1, c: 'k', soft: 1 },
+    { t: 'l', pts: [[.38, .72], [.14, .8], [.05, 1.02]], c: 'k' },
+    { t: 'l', pts: [[.62, .72], [.86, .8], [.95, 1.02]], c: 'k' },
+    { t: 'l', pts: [[.41, .74], [.5, .79], [.59, .74]], c: 'k' },
+    { t: 'l', pts: [[.42, .615], [.42, .74]], c: 'k' },
+    { t: 'l', pts: [[.58, .615], [.58, .74]], c: 'k' },
+    { t: 'l', pts: [[.29, .32], [.3, .49], [.39, .6], [.5, .64], [.61, .6], [.7, .49], [.71, .32]], c: 'k' },
+    { t: 'e', x: .275, y: .43, rx: .022, ry: .045, c: 'k' },
+    { t: 'e', x: .725, y: .43, rx: .022, ry: .045, c: 'k' },
+    { t: 'p', pts: [[.29, .36], [.27, .22], [.35, .13], [.5, .1], [.65, .13], [.73, .22], [.71, .36], [.67, .25], [.6, .23], [.55, .27], [.47, .22], [.4, .26], [.34, .24]], f: 1, c: 'k' },
+    { t: 'c', x: .41, y: .41, r: .062, c: 'k', w: .8 },
+    { t: 'c', x: .59, y: .41, r: .062, c: 'k', w: .8 },
+    { t: 'l', pts: [[.472, .405], [.528, .405]], c: 'k', w: .8 },
+    { t: 'l', pts: [[.5, .44], [.485, .5], [.51, .51]], c: 'k' },
+    { t: 'l', pts: [[.44, .56], [.5, .567], [.56, .556]], c: 'k' },
+  ] },
+  { name: 'Haijun Xia', shapes: [
+    { t: 'c', x: .5, y: .42, r: .34, f: 1, c: 5, soft: 1 },
+    { t: 'p', pts: [[.38, .71], [.13, .8], [.04, 1.02], [.96, 1.02], [.87, .8], [.62, .71]], f: 1, c: 1 },
+    { t: 'l', pts: [[.4, .72], [.5, .77], [.6, .72]], c: 'k' },
+    { t: 'l', pts: [[.41, .745], [.5, .795], [.59, .745]], c: 'k' },
+    { t: 'l', pts: [[.43, .595], [.43, .72]], c: 'k' },
+    { t: 'l', pts: [[.57, .595], [.57, .72]], c: 'k' },
+    { t: 'l', pts: [[.3, .32], [.31, .48], [.39, .58], [.5, .62], [.61, .58], [.69, .48], [.7, .32]], c: 'k' },
+    { t: 'e', x: .285, y: .42, rx: .022, ry: .045, c: 'k' },
+    { t: 'e', x: .715, y: .42, rx: .022, ry: .045, c: 'k' },
+    { t: 'p', pts: [[.3, .34], [.29, .21], [.36, .12], [.48, .08], [.62, .1], [.71, .19], [.7, .33], [.66, .23], [.55, .19], [.43, .2], [.35, .26]], f: 1, c: 'k' },
+    { t: 'r', x0: .34, y0: .37, x1: .47, y1: .435, c: 'k', w: 1.1 },
+    { t: 'r', x0: .53, y0: .37, x1: .66, y1: .435, c: 'k', w: 1.1 },
+    { t: 'l', pts: [[.47, .39], [.53, .39]], c: 'k' },
+    { t: 'l', pts: [[.5, .45], [.49, .49], [.51, .5]], c: 'k' },
+    { t: 'p', pts: [[.42, .525], [.5, .538], [.58, .525], [.55, .555], [.5, .565], [.45, .555]], c: 'k' },
+  ] },
+];
+const foundersEl = document.getElementById('founders'), portraits = FOUNDERS.map((F, i) => {
+  const li = document.createElement('li'); li.style.setProperty('--i', i);
+  const card = document.createElement('div'); card.className = 'card'; card.setAttribute('role', 'img'); card.setAttribute('aria-label', `Line drawing of ${F.name}`);
+  const cv = document.createElement('canvas'); card.append(cv);
+  li.append(card, Object.assign(document.createElement('b'), { textContent: F.name }), Object.assign(document.createElement('span'), { textContent: 'Co-founder' }));
+  foundersEl.append(li); return cv;
+});
+function drawFounders() {
+  const T = THEMES[S.theme];
+  FOUNDERS.forEach((F, i) => {
+    const cv = portraits[i]; cv.width = CW; cv.height = CH;
+    const p = cv.getContext('2d'), r = rng(4000 + i * 131 + (S.hand === 'pencil' ? 11 : 29));
+    p.fillStyle = T.paper; p.fillRect(0, 0, CW, CH);
+    p.save(); p.beginPath(); p.rect(0, 0, CW, CH); p.clip();
+    drawShapes(p, F.shapes, { x: 24, y: 70, w: CW - 48, h: CH - 70 }, r);
+    p.restore();
+    for (let k = 0; k < 9000; k++) { p.fillStyle = r() > .5 ? 'rgba(0,0,0,.045)' : 'rgba(255,255,255,.1)'; p.fillRect(r() * CW, r() * CH, 1, 1); }
+  });
+}
+
+/* ---------- build the wall ---------- */
+const placard = document.getElementById('placard'), echo = document.getElementById('echo'), titleEl = document.getElementById('title'), lineEl = document.getElementById('line');
+const home = document.getElementById('home'), wall = document.getElementById('wall'), env = document.getElementById('env');
+const floats = [], layers = [];
+PRODUCTS.forEach((P, i) => {
+  const f = document.createElement('div'); f.className = 'float'; f.style.setProperty('--i', i); f.tabIndex = 0;
+  f.setAttribute('role', 'img'); f.setAttribute('aria-label', P.label);
+  const card = document.createElement('div'); card.className = 'card';
+  const paper = document.createElement('canvas'), obj = document.createElement('canvas');
+  card.append(paper, obj); f.append(card); wall.append(f);
+  floats.push(f); layers.push({ card, paper, obj });
+});
+
+/* ---------- hover: lift the product out into its setting ---------- */
+const ENV_PAD = 120;
+let active = -1, overlay = null, leaveTimer = 0, scrollAt = 0, lastW = window.innerWidth;
+const returning = {};
+function geometry(i) {
+  const cr = layers[i].card.getBoundingClientRect(), mr = home.getBoundingClientRect(), L = PRODUCTS[i].lift;
+  const start = { x: cr.left - mr.left, y: cr.top - mr.top, w: cr.width, h: cr.height };
+  const cx = start.x + start.w / 2 + L.dx * start.w, cy = start.y + start.h / 2 + L.dy * start.h;
+  return { start, end: { x: cx - start.w * L.s / 2, y: cy - start.h * L.s / 2, w: start.w * L.s, h: start.h * L.s }, L };
+}
+function paintEnv(i, end) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = home.clientWidth, H = home.clientHeight + ENV_PAD;
+  env.width = Math.round(W * dpr); env.height = Math.round(H * dpr);
+  const c = env.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  const A = { x: end.x + end.w * ART.x / CW, y: ENV_PAD + end.y + end.h * ART.y / CH, w: end.w * ART.w / CW, h: end.h * ART.h / CH };
+  drawShapes(c, PRODUCTS[i].env, A, rng(i * 31 + 7), S.hand === 'crayon' ? .3 : .32);
+}
+/* make room: windows left of the product slide left, windows right of it slide right */
+function pushAside(i, start, end) {
+  const mr = home.getBoundingClientRect(), cx = start.x + start.w / 2;
+  const half = end.w / 2 + Math.max(110, window.innerWidth * .1);
+  const rect = j => { const r = layers[j].card.getBoundingClientRect(); return { l: r.left - mr.left, r: r.right - mr.left }; };
+  const dL = i > 0 ? Math.min(0, (cx - half) - rect(i - 1).r) : 0;
+  const dR = i < floats.length - 1 ? Math.max(0, (cx + half) - rect(i + 1).l) : 0;
+  floats.forEach((f, j) => f.style.setProperty('--push', j < i ? dL + 'px' : j > i ? dR + 'px' : '0px'));
+}
+/* landing: hanging things swing on their hook and settle; standing things drop, bounce and squash a little */
+const SETTLE = [
+  { kind: 'swing', at: [.5, -.02], kick: .16, w: 5.2, k: 1.5 },
+  { kind: 'swing', at: [.5, .2], kick: .13, w: 6.2, k: 1.9 },
+  { kind: 'swing', at: [.5, .19], kick: .08, w: 4.6, k: 2 },
+  { kind: 'drop', at: [.5, .95], h: 26, e: .34, squash: .07 },
+  { kind: 'drop', at: [.5, .87], h: 30, e: .4, squash: .06 },
+  { kind: 'drop', at: [.5, .9], h: 22, e: .3, squash: .05, wobble: .08 },
+];
+const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches, FLY = .72;
+function setLift(ov, st) { ov.style.transform = `translate(${st.tx}px, ${st.ty + st.y}px) rotate(${st.rot}rad) scale(${st.s * (1 + st.q * .6)}, ${st.s * (1 - st.q)})`; }
+function flyIn(ov, i, start, end, L) {
+  const P = SETTLE[i], w = start.w, h = start.h;
+  const ox = (ART.x + P.at[0] * ART.w) / CW * w, oy = (ART.y + P.at[1] * ART.h) / CH * h;
+  ov.style.transformOrigin = `${ox}px ${oy}px`;
+  const dcx = end.x + end.w / 2 - start.x - w / 2, dcy = end.y + end.h / 2 - start.y - h / 2, s = L.s;
+  const ftx = w / 2 + dcx - ox - s * (w / 2 - ox), fty = h / 2 + dcy - oy - s * (h / 2 - oy);
+  const st = ov._st = { tx: 0, ty: 0, s: 1, rot: 0, q: 0, y: 0 };
+  if (REDUCE) { Object.assign(st, { tx: ftx, ty: fty, s }); setLift(ov, st); return; }
+  const t0 = performance.now(); let last = t0, y = -(P.h || 0), vy = 0, q = 0, qv = 0, landed = -1, rest = false;
+  const frame = now => {
+    if (ov._stop) return;
+    const T = (now - t0) / 1000, dt = Math.min(.033, (now - last) / 1000); last = now;
+    const p = Math.min(1, T / FLY), e = 1 - Math.pow(1 - p, 3);
+    st.tx = ftx * e; st.ty = fty * e; st.s = 1 + (s - 1) * e;
+    if (P.kind === 'swing') {
+      st.rot = p < 1 ? P.kick * Math.sin(p * Math.PI / 2) * e : P.kick * Math.exp(-P.k * (T - FLY)) * Math.cos(P.w * (T - FLY));
+    } else if (p < 1) {
+      st.y = -P.h * e;
+    } else {
+      if (!rest) {
+        vy += 2600 * dt; y += vy * dt;
+        if (y >= 0 && vy > 0) { const hit = vy; y = 0; vy = -vy * P.e; qv += Math.min(2.2, hit / 500) * P.squash * 10; if (landed < 0) landed = T; if (Math.abs(vy) < 120) { vy = 0; rest = true; } }
+      }
+      qv += (-180 * q - 13 * qv) * dt; q += qv * dt;
+      st.y = y; st.q = q;
+      if (P.wobble && landed >= 0) { const u = T - landed; st.rot = P.wobble * Math.exp(-3 * u) * Math.sin(9 * u); }
+    }
+    setLift(ov, st);
+    if (T < 3.4) ov._raf = requestAnimationFrame(frame);
+  };
+  ov._raf = requestAnimationFrame(frame);
+}
+function flyBack(ov, done) {
+  ov._stop = true; cancelAnimationFrame(ov._raf);
+  const a = { ...(ov._st || { tx: 0, ty: 0, s: 1, rot: 0, q: 0, y: 0 }) }, st = { ...a }, t0 = performance.now(), D = REDUCE ? .01 : .62;
+  const frame = now => {
+    if (ov._cancel) return;
+    const p = Math.min(1, (now - t0) / 1000 / D), e = p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+    for (const k of ['tx', 'ty', 'rot', 'q', 'y']) st[k] = a[k] * (1 - e);
+    st.s = a.s + (1 - a.s) * e; setLift(ov, st);
+    if (p < 1) requestAnimationFrame(frame); else done();
+  };
+  requestAnimationFrame(frame);
+}
+function activate(i) {
+  clearTimeout(leaveTimer);
+  if (active === i) return;
+  if (active >= 0) release(true);
+  restCard(i);
+  if (returning[i]) { returning[i].ov._cancel = true; returning[i].ov.remove(); delete returning[i]; }
+  active = i;
+  wall.classList.add('focus');
+  const { start, end, L } = geometry(i);
+  pushAside(i, start, end);
+  const ov = document.createElement('canvas'); ov.width = CW; ov.height = CH; ov.className = 'lift'; ov.setAttribute('aria-hidden', 'true');
+  ov.getContext('2d').drawImage(layers[i].obj, 0, 0);
+  Object.assign(ov.style, { left: start.x + 'px', top: start.y + 'px', width: start.w + 'px', height: start.h + 'px' });
+  home.append(ov); overlay = ov;
+  layers[i].obj.style.visibility = 'hidden';
+  floats[i].classList.add('on');
+  if (S.echo) { echo.textContent = PRODUCTS[i].q; placard.classList.add('echoing'); }
+  paintEnv(i, end);
+  env.style.setProperty('--mx', (start.x + start.w / 2) + 'px'); env.style.setProperty('--my', (ENV_PAD + start.y + start.h / 2) + 'px');
+  ov.getBoundingClientRect();
+  scrollAt = wall.scrollLeft;
+  requestAnimationFrame(() => {
+    if (overlay !== ov) return;
+    ov.classList.add('up');
+    flyIn(ov, i, start, end, L);
+    env.classList.add('show');
+  });
+}
+function release(now) {
+  const i = active; if (i < 0) return;
+  active = -1; const ov = overlay; overlay = null;
+  env.classList.remove('show'); wall.classList.remove('focus'); floats[i].classList.remove('on'); placard.classList.remove('echoing');
+  const done = () => { ov._stop = true; cancelAnimationFrame(ov._raf); ov.remove(); layers[i].obj.style.visibility = ''; if (returning[i]?.ov === ov) delete returning[i]; };
+  if (now) { done(); return; }
+  ov.classList.remove('up'); ov.classList.add('back');
+  returning[i] = { ov }; flyBack(ov, done);
+}
+floats.forEach((f, i) => {
+  f.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse' && !drag?.moved) activate(i); });
+  f.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') leaveTimer = setTimeout(() => { if (active === i) release(); }, 120); });
+  f.addEventListener('click', e => { if (e.pointerType && e.pointerType !== 'mouse') active === i ? release() : activate(i); });
+  f.addEventListener('focus', () => activate(i));
+  f.addEventListener('blur', () => { if (active === i) release(); });
+});
+window.addEventListener('resize', () => { if (window.innerWidth !== lastW) { lastW = window.innerWidth; release(true); } });
+
+/* drag to scroll */
+let drag = null;
+wall.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') return; drag = { x: e.clientX, s: wall.scrollLeft, moved: false }; });
+window.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x; if (Math.abs(dx) > 4 && !drag.moved) { drag.moved = true; wall.classList.add('dragging'); release(true); } wall.scrollLeft = drag.s - dx; });
+window.addEventListener('pointerup', () => { drag = null; wall.classList.remove('dragging'); });
+wall.addEventListener('scroll', () => { if (active >= 0 && !drag && Math.abs(wall.scrollLeft - scrollAt) > 2) release(true); }, { passive: true });
+
+/* ---------- apply settings ---------- */
+const root = document.documentElement.style;
+function apply() {
+  const T = THEMES[S.theme], F = FONTS.find(f => f.id === S.font) || FONTS[0];
+  root.setProperty('--wall-top', T.wall[0]); root.setProperty('--wall-bottom', T.wall[1]); root.setProperty('--paper', T.paper);
+  root.setProperty('--ink', T.ink); root.setProperty('--muted', T.muted); root.setProperty('--panel', T.panel); root.setProperty('--shadow', T.shadow);
+  root.setProperty('--font-title', F.css); root.setProperty('--title-weight', F.weight); root.setProperty('--title-style', F.style); root.setProperty('--title-track', F.track || '0');
+  const pv = document.getElementById('preview'); pv.style.fontFamily = F.css; pv.style.fontWeight = F.weight; pv.style.fontStyle = F.style;
+  release(true);
+  partCache = {}; cursorImg = makeCursor(); resetDemos();
+  PRODUCTS.forEach((P, i) => drawCard(i));
+  drawFounders();
+}
+
+/* ---------- title: position and effects ---------- */
+const WORDS = [['w-world', 'World'], ['w-in', 'In'], ['w-sights', 'Sights']];
+let kk = 0;
+titleEl.innerHTML = WORDS.map(([cls, w]) => `<span class="${cls}">${[...w].map(ch => `<span class="ch" aria-hidden="true" style="--k:${kk++}">${ch}</span>`).join('')}</span>`).join('');
+const letters = [...titleEl.querySelectorAll('.ch')];
+/* The company name is not final, so the big title is hidden for now. Set SHOW_TITLE to true to bring it back. */
+const SHOW_TITLE = true;
+if (!SHOW_TITLE) { titleEl.hidden = true; document.documentElement.classList.add('no-title'); }
+const SLOTS = { above: 'slotTop', behind: 'slotBack', below: 'slotBelow' };
+function placeTitle() { document.getElementById(SLOTS[S.layout] || 'slotBelow').append(titleEl); }
+function playInk() { titleEl.classList.remove('ink'); lineEl.classList.remove('ink-line'); void titleEl.offsetWidth; titleEl.classList.add('ink'); lineEl.classList.add('ink-line'); }
+let ptr = null, followRaf = 0;
+function follow() {
+  followRaf = 0;
+  letters.forEach(el => {
+    if (!S.follow || !ptr || REDUCE) { el.style.transform = ''; return; }
+    const r = el.getBoundingClientRect(), dx = ptr.x - (r.left + r.width / 2), dy = ptr.y - (r.top + r.height / 2), f = Math.max(0, 1 - Math.hypot(dx, dy) / 170);
+    el.style.transform = f ? `translateY(${-14 * f * f}px) rotate(${-dx / 170 * 9 * f}deg)` : '';
+  });
+}
+window.addEventListener('pointermove', e => { ptr = { x: e.clientX, y: e.clientY }; ptrAt = performance.now(); if (S.follow && !followRaf) followRaf = requestAnimationFrame(follow); }, { passive: true });
+document.addEventListener('pointerleave', () => { ptr = null; follow(); });
+
+/* ---------- settings panel ---------- */
+const fontSel = document.getElementById('font');
+FONTS.forEach(f => { const o = document.createElement('option'); o.value = f.id; o.textContent = f.name; fontSel.append(o); });
+fontSel.value = S.font;
+fontSel.addEventListener('change', () => { S.font = fontSel.value; save(); apply(); });
+function seg(el, name, options, current, onPick) {
+  el.innerHTML = options.map(([v, label, swatch]) => `<label><input type="radio" name="${name}" id="${name}-${v}" value="${v}" ${v === current ? 'checked' : ''}><span>${label}${swatch || ''}</span></label>`).join('');
+  el.addEventListener('change', e => onPick(e.target.value));
+}
+seg(document.getElementById('theme'), 'theme', Object.entries(THEMES).map(([id, t]) => [id, t.name, `<span class="dots">${[t.wall[0], t.paper, ...t.inks.slice(0, 4)].map(c => `<i style="background:${c}"></i>`).join('')}</span>`]), S.theme, v => { S.theme = v; save(); apply(); });
+seg(document.getElementById('hand'), 'hand', Object.entries(HAND_NAMES).map(([id, n]) => [id, n]), S.hand, v => { S.hand = v; save(); apply(); });
+seg(document.getElementById('layout'), 'layout', [['above', 'Above'], ['behind', 'Behind'], ['below', 'Below']], S.layout, v => { S.layout = v; save(); placeTitle(); if (S.ink) playInk(); });
+[['fx-ink', 'ink'], ['fx-follow', 'follow'], ['fx-echo', 'echo']].forEach(([id, k]) => {
+  const el = document.getElementById(id); el.checked = !!S[k];
+  el.addEventListener('change', () => { S[k] = el.checked; save(); if (k === 'ink' && S.ink) playInk(); if (k === 'follow') follow(); });
+});
+placeTitle(); if (S.ink) playInk();
+
+const panel = document.getElementById('settings'), gear = document.getElementById('gear');
+const openPanel = open => { panel.hidden = !open; gear.setAttribute('aria-expanded', String(open)); if (open) fontSel.focus(); };
+gear.addEventListener('click', () => openPanel(panel.hidden));
+document.getElementById('close').addEventListener('click', () => { openPanel(false); gear.focus(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) { openPanel(false); gear.focus(); } });
+document.addEventListener('pointerdown', e => { if (!panel.hidden && !panel.contains(e.target) && !gear.contains(e.target)) openPanel(false); });
+
+/* ---------- views ---------- */
+function route() {
+  const about = location.hash === '#about';
+  document.getElementById('home').hidden = about; document.getElementById('about').hidden = !about;
+  document.getElementById('nav-about').toggleAttribute('aria-current', about); document.getElementById('nav-home').toggleAttribute('aria-current', !about);
+  if (about) document.getElementById('nav-about').setAttribute('aria-current', 'page'); else document.getElementById('nav-home').setAttribute('aria-current', 'page');
+}
+window.addEventListener('hashchange', route);
+document.getElementById('nav-home').addEventListener('click', e => { e.preventDefault(); if (location.hash) location.hash = ''; route(); });
+route();
+
+Promise.all(FONTS.map(f => document.fonts.load(`${f.style} ${f.weight} 40px ${f.css.split(',')[0]}`))).catch(() => {}).then(apply);
+apply();
+requestAnimationFrame(tick);
+</script>
+
