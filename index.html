@@ -142,6 +142,7 @@ footer { padding-block: 0 24px; font-size: 13px; color: var(--muted); }
 .beta { box-sizing: border-box; width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 0; border-radius: 16px; background: var(--panel); color: var(--ink); box-shadow: 0 24px 60px rgba(var(--shadow), .28); overflow: auto; }
 .beta::backdrop { background: rgba(42, 41, 38, .32); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 .beta[open] { animation: fadeUp .35s ease; }
+.beta:focus { outline: none; } /* opened from the #beta link, Safari focuses the card itself and rings it; its field and buttons keep their rings */
 .beta-in { position: relative; padding: 30px 26px 26px; text-align: center; }
 .beta-ask, .beta-done { display: grid; gap: 14px; }
 .beta h2 { margin: 0; font-family: var(--font-title); font-weight: var(--title-weight, 400); font-style: var(--title-style, normal); font-size: clamp(30px, 8vw, 38px); line-height: 1.05; letter-spacing: var(--title-track, 0); }
@@ -202,7 +203,7 @@ footer { padding-block: 0 24px; font-size: 13px; color: var(--muted); }
     <button type="button" class="beta-x" id="beta-close" aria-label="Close">×</button>
     <div class="beta-ask">
       <h2 id="beta-title">Join the private beta</h2>
-      <p>We're letting a small group in first. Leave your email and we'll send an invite when a spot opens.</p>
+      <p>WorldInSights works right inside the AI assistant you already use. We're letting a small group in first: leave your email and we'll send an invite when a spot opens.</p>
       <form id="beta-form" novalidate>
         <input type="email" name="email" id="beta-email" required autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" aria-label="Email address" aria-describedby="beta-msg" autofocus>
         <input type="text" name="_gotcha" class="trap" tabindex="-1" autocomplete="off" aria-hidden="true">
@@ -213,7 +214,7 @@ footer { padding-block: 0 24px; font-size: 13px; color: var(--muted); }
     </div>
     <div class="beta-done">
       <h2>You're on the list</h2>
-      <p>Thank you. We'll email you when your invite is ready.</p>
+      <p>Thank you. We'll email you when your invite is ready, with how to add WorldInSights to your AI assistant.</p>
       <form method="dialog"><button class="beta-btn" id="beta-ok">Done</button></form>
     </div>
   </div>
