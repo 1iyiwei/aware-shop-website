@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sedgwick+Ave+Display&family=Young+Serif&family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Cormorant+Garamond:ital,wght@1,500&family=Bagel+Fat+One&family=Caveat:wght@600&family=Figtree:wght@400;500&display=swap">
 <style>
-/* Layout: the Gallery wall. A row of product windows floats at eye level; the name and conviction are centered (below, above or behind the wall, chosen in Settings). */
+/* Layout: the Gallery wall. A row of product windows floats at eye level; the name and conviction are centered (below, above or behind the wall, set by DEFAULTS.layout). */
 :root {
   --wall-top: #ebe9e4;
   --wall-bottom: #dcd9d1;
@@ -38,8 +38,8 @@ nav { position: relative; z-index: 4; display: flex; align-items: center; justif
 nav .links { display: flex; align-items: center; gap: 22px; }
 nav a { text-decoration: none; }
 nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
-.gear { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: transparent; cursor: pointer; color: var(--muted); }
-.gear:hover { color: var(--ink); border-color: var(--muted); }
+.beta-link { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); background: color-mix(in oklab, var(--paper) 60%, transparent); white-space: nowrap; transition: border-color .2s, background-color .2s; }
+.beta-link:hover { border-color: var(--muted); background: var(--paper); }
 
 /* the wall */
 .wall { display: flex; gap: clamp(20px, 3vw, 40px); overflow-x: auto; overscroll-behavior-x: contain; padding-block: 28px 56px; scrollbar-width: none; cursor: grab; align-items: flex-start; }
@@ -50,13 +50,16 @@ nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
 .wall::before { margin-left: auto; }
 .wall::after { margin-right: auto; }
 .float { flex: 0 0 auto; animation: drift 5.2s ease-in-out infinite; animation-delay: calc(var(--i) * -0.7s); transition: opacity .7s ease, filter .7s ease, translate .9s cubic-bezier(.22, .9, .24, 1); outline: none; }
+/* touch: no grey tap flash, no double-tap zoom when tapping a window open and shut, no text-selection callout on a long press */
+.float { -webkit-tap-highlight-color: transparent; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 @keyframes drift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 .card { position: relative; width: clamp(108px, min(17vw, 29vh), 236px); aspect-ratio: 3 / 4; border-radius: 12px; background: var(--paper); box-shadow: 0 16px 28px rgba(var(--shadow), .17), 0 2px 4px rgba(var(--shadow), .06); transition: opacity .55s ease, transform .7s cubic-bezier(.22, .9, .24, 1), box-shadow .55s; overflow: hidden; }
 /* held upright (phones, tablets), there is height to spare: larger windows, two or three in view with the next one peeking */
 @media (orientation: portrait) { .card { width: clamp(130px, min(26vw, 22vh), 236px); } }
 @media (orientation: portrait) and (max-width: 600px) { .card { width: clamp(130px, 40vw, 180px); } }
 .card canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
-.float:focus-visible .card { box-shadow: 0 0 0 2px var(--ink), 0 16px 28px rgba(var(--shadow), .17); }
+/* the focus ring is for keyboard visitors: Safari would otherwise draw it on every window a finger taps */
+.float:focus-visible:not([data-tapped]) .card { box-shadow: 0 0 0 2px var(--ink), 0 16px 28px rgba(var(--shadow), .17); }
 
 /* hover: the product steps out of its window into a faint sketch of where it lives */
 #home { position: relative; overflow-x: clip; display: flex; flex-direction: column; justify-content: center; }
@@ -108,10 +111,6 @@ nav a:hover, nav a[aria-current="page"] { color: var(--ink); }
 @keyframes inkIn { from { opacity: 0; transform: translateY(.2em) rotate(-5deg); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .ink .ch, .ink-line { animation: none; } .ch { transition: none; } }
-.seg.three { grid-template-columns: repeat(3, 1fr); }
-.checks { display: grid; gap: 8px; font-size: 14px; }
-.checks label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
-.checks input { margin-top: 3px; accent-color: var(--ink); }
 h1 { font-family: var(--font-title); font-weight: var(--title-weight, 400); font-style: var(--title-style, normal); font-size: clamp(54px, min(9vw, 15vh), 120px); line-height: .95; margin: 0; letter-spacing: var(--title-track, 0); }
 .placard p { margin: 0; max-width: 34em; font-size: clamp(16px, 1.4vw, 19px); text-wrap: balance; }
 .placard p span { color: var(--muted); }
@@ -139,22 +138,30 @@ h1 { font-family: var(--font-title); font-weight: var(--title-weight, 400); font
 @media (prefers-reduced-motion: reduce) { .founders li { animation: none; } }
 footer { padding-block: 0 24px; font-size: 13px; color: var(--muted); }
 
-/* settings */
-.settings { box-sizing: border-box; position: fixed; top: calc(72px + env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: min(320px, calc(100vw - 32px)); background: var(--panel); color: var(--ink); border-radius: 14px; box-shadow: 0 24px 60px rgba(var(--shadow), .25); padding: 20px; display: grid; gap: 18px; z-index: 20; max-height: calc(100vh - 96px); overflow-y: auto; }
-.settings h2 { margin: 0; font-size: 15px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
-.settings h2 button { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 20px; line-height: 1; padding: 2px 6px; }
-.field { display: grid; gap: 8px; }
-.field > span { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.field select { padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); }
-.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.seg label { position: relative; }
-.seg input { position: absolute; opacity: 0; inset: 0; }
-.seg label > span { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; cursor: pointer; background: var(--paper); }
-.seg input:checked + span, .seg label > input:checked + span { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
-.seg input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
-.dots { display: flex; gap: 3px; }
-.dots i { width: 12px; height: 12px; border-radius: 50%; }
-.font-preview { font-size: 30px; line-height: 1.1; padding: 4px 0 0; }
+/* private beta sign-up: a small card over the page, opened from the menu or a link to #beta */
+.beta { box-sizing: border-box; width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 0; border-radius: 16px; background: var(--panel); color: var(--ink); box-shadow: 0 24px 60px rgba(var(--shadow), .28); overflow: auto; }
+.beta::backdrop { background: rgba(42, 41, 38, .32); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.beta[open] { animation: fadeUp .35s ease; }
+.beta:focus { outline: none; } /* opened from the #beta link, Safari focuses the card itself and rings it; its field and buttons keep their rings */
+.beta-in { position: relative; padding: 30px 26px 26px; text-align: center; }
+.beta-ask, .beta-done { display: grid; gap: 14px; }
+.beta h2 { margin: 0; font-family: var(--font-title); font-weight: var(--title-weight, 400); font-style: var(--title-style, normal); font-size: clamp(30px, 8vw, 38px); line-height: 1.05; letter-spacing: var(--title-track, 0); }
+.beta p { margin: 0; color: var(--muted); text-wrap: balance; }
+.beta-x { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 24px; line-height: 1; cursor: pointer; }
+.beta-x:hover { color: var(--ink); }
+.beta form { display: grid; gap: 10px; margin-top: 4px; }
+.beta input[type=email] { box-sizing: border-box; width: 100%; padding: 13px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); font: inherit; font-size: 16px; color: var(--ink); text-align: center; }
+.beta input[type=email]:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+.beta-btn { padding: 13px 18px; border: 0; border-radius: 999px; background: var(--ink); color: var(--paper); font-weight: 500; cursor: pointer; transition: opacity .2s; }
+.beta-btn:hover { opacity: .88; }
+.beta-btn:disabled { opacity: .5; cursor: default; }
+.beta .fine { font-size: 13px; }
+.beta-msg { font-size: 14px; color: var(--muted); }
+.beta-msg:empty { display: none; }
+.beta-msg.bad { color: #a3402b; }
+.beta .trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.beta.done .beta-ask, .beta:not(.done) .beta-done { display: none; }
+@media (prefers-reduced-motion: reduce) { .beta[open] { animation: none; } }
 </style>
 
 <div class="page">
@@ -162,9 +169,7 @@ footer { padding-block: 0 24px; font-size: 13px; color: var(--muted); }
     <a href="#" id="nav-home">Worlds</a>
     <div class="links">
       <a href="#about" id="nav-about">About</a>
-      <button class="gear" id="gear" type="button" aria-label="Settings" aria-expanded="false" aria-controls="settings">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
-      </button>
+      <a href="#beta" class="beta-link" id="nav-beta" aria-haspopup="dialog">Private beta</a>
     </div>
   </nav>
 
@@ -193,23 +198,27 @@ footer { padding-block: 0 24px; font-size: 13px; color: var(--muted); }
   <footer class="pad">© 2026 WorldInSights</footer>
 </div>
 
-<div class="settings" id="settings" role="dialog" aria-label="Settings" hidden>
-  <h2>Settings <button type="button" id="close" aria-label="Close settings">×</button></h2>
-  <label class="field"><span>Title font</span>
-    <select id="font"></select>
-    <div class="font-preview" id="preview">WorldInSights</div>
-  </label>
-  <div class="field"><span>Colors</span><div class="seg" id="theme"></div></div>
-  <div class="field"><span>Drawing</span><div class="seg" id="hand"></div></div>
-  <div class="field"><span>Title position</span><div class="seg three" id="layout"></div></div>
-  <div class="field"><span>Text effects</span>
-    <div class="checks">
-      <label><input type="checkbox" id="fx-ink"> <span>Ink in on load: letters write themselves in, then the sentence fades up</span></label>
-      <label><input type="checkbox" id="fx-follow"> <span>Letters follow the cursor: nearby letters lift and tilt a little</span></label>
-      <label><input type="checkbox" id="fx-echo"> <span>Echo the open world: the sentence becomes that product's shopper question</span></label>
+<dialog class="beta" id="beta" aria-labelledby="beta-title">
+  <div class="beta-in">
+    <button type="button" class="beta-x" id="beta-close" aria-label="Close">×</button>
+    <div class="beta-ask">
+      <h2 id="beta-title">Join the private beta</h2>
+      <p>WorldInSights works right inside the AI assistant you already use. We're letting a small group in first: leave your email and we'll send an invite when a spot opens.</p>
+      <form id="beta-form" novalidate>
+        <input type="email" name="email" id="beta-email" required autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" aria-label="Email address" aria-describedby="beta-msg" autofocus>
+        <input type="text" name="_gotcha" class="trap" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button type="submit" class="beta-btn">Request an invite</button>
+        <p class="beta-msg" id="beta-msg" role="status" aria-live="polite"></p>
+      </form>
+      <p class="fine">Email only. We'll use it just for beta updates.</p>
+    </div>
+    <div class="beta-done">
+      <h2>You're on the list</h2>
+      <p>Thank you. We'll email you when your invite is ready, with how to add WorldInSights to your AI assistant.</p>
+      <form method="dialog"><button class="beta-btn" id="beta-ok">Done</button></form>
     </div>
   </div>
-</div>
+</dialog>
 
 <script>
 /* ---------- options ---------- */
@@ -227,11 +236,10 @@ const THEMES = {
   kraft:    { name: 'Kraft & pastel', wall: ['#dcc8a8', '#c9b08b'], paper: '#f0e5d1', ink: '#1f1a14', muted: '#5f5141', panel: '#f3e9d8', shadow: '60, 38, 14', key: '#1f1a14',
               inks: ['#d6392b', '#2e5fb7', '#f0b429', '#3e8a4f', '#e98aa0', '#8a6bb8'] },
 };
-const HAND_NAMES = { pencil: 'Pencil & wash', crayon: 'Oil pastel' };
+/* The look every visitor gets. There is no on-page settings panel: change these here.
+   layout: 'below' | 'above' | 'behind' the wall; ink: letters write in on load; follow: letters lean toward the cursor; echo: the tagline becomes the open product's question */
 const DEFAULTS = { font: 'sedgwick', theme: 'graphite', hand: 'pencil', layout: 'below', ink: true, follow: false, echo: true };
-let S = { ...DEFAULTS };
-try { const saved = JSON.parse(localStorage.getItem('wi-settings') || '{}'); S = { ...S, ...saved }; } catch (e) {}
-const save = () => { try { localStorage.setItem('wi-settings', JSON.stringify(S)); } catch (e) {} };
+const S = { ...DEFAULTS };
 
 /* ---------- products: plain shapes in a 0..1 box, drawn by hand ----------
    c = ink index (0 warm, 1 blue, 2 gold, 3 green, 4 rose, 5 lilac), 'k' = pencil/key line, soft = faint fill */
@@ -910,17 +918,21 @@ function release(now, keepPush) {
   ov.classList.remove('up'); ov.classList.add('back');
   returning[i] = { ov }; flyBack(ov, done);
 }
-let pointerAt = -1e9;
-document.addEventListener('pointerdown', () => { pointerAt = performance.now(); }, true);
+/* Tap or mouse click? Ask the pointerdown that started it, not the click: Safari (and so every browser on iPhone and iPad)
+   reports the click that follows a finger tap as pointerType "mouse", or leaves pointerType out, while its pointerdown says "touch" */
+let pointerAt = -1e9, pointerKind = 'mouse';
+document.addEventListener('pointerdown', e => { pointerAt = performance.now(); pointerKind = e.pointerType || 'mouse'; }, true);
+/* a tap anywhere outside the open window closes it (iOS keeps focus on the window, so blur alone doesn't) */
+document.addEventListener('pointerdown', e => { if (active >= 0 && e.pointerType && e.pointerType !== 'mouse' && !floats[active].contains(e.target)) release(); });
 floats.forEach((f, i) => {
   f.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse' && !drag?.moved) activate(i); });
   /* take focus without the browser scrolling the window into view, which would read as a scroll and close it */
-  f.addEventListener('pointerdown', () => { if (document.activeElement !== f) f.focus({ preventScroll: true }); });
+  f.addEventListener('pointerdown', () => { f.dataset.tapped = ''; if (document.activeElement !== f) f.focus({ preventScroll: true }); });
   f.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') leaveTimer = setTimeout(() => { if (active === i) release(); }, 120); });
-  f.addEventListener('click', e => { if (e.pointerType && e.pointerType !== 'mouse') active === i ? release() : activate(i); });
+  f.addEventListener('click', () => { if (pointerKind !== 'mouse') active === i ? release() : activate(i); });
   /* keyboard focus opens a window; the focus a tap or click brings is left to the pointer handlers */
   f.addEventListener('focus', () => { if (performance.now() - pointerAt > 800) activate(i); });
-  f.addEventListener('blur', () => { if (active === i) release(); });
+  f.addEventListener('blur', () => { delete f.dataset.tapped; if (active === i) release(); });
 });
 window.addEventListener('resize', () => { if (window.innerWidth !== lastW) { lastW = window.innerWidth; release(true); } });
 
@@ -938,7 +950,6 @@ function apply() {
   root.setProperty('--wall-top', T.wall[0]); root.setProperty('--wall-bottom', T.wall[1]); root.setProperty('--paper', T.paper);
   root.setProperty('--ink', T.ink); root.setProperty('--title-accent', T.inks[0]); root.setProperty('--muted', T.muted); root.setProperty('--panel', T.panel); root.setProperty('--shadow', T.shadow);
   root.setProperty('--font-title', F.css); root.setProperty('--title-weight', F.weight); root.setProperty('--title-style', F.style); root.setProperty('--title-track', F.track || '0');
-  const pv = document.getElementById('preview'); pv.style.fontFamily = F.css; pv.style.fontWeight = F.weight; pv.style.fontStyle = F.style;
   release(true);
   partCache = {}; cursorImg = makeCursor(); resetDemos();
   PRODUCTS.forEach((P, i) => drawCard(i));
@@ -968,44 +979,67 @@ function follow() {
 window.addEventListener('pointermove', e => { ptr = { x: e.clientX, y: e.clientY }; ptrAt = performance.now(); if (S.follow && !followRaf) followRaf = requestAnimationFrame(follow); }, { passive: true });
 document.addEventListener('pointerleave', () => { ptr = null; follow(); });
 
-/* ---------- settings panel ---------- */
-const fontSel = document.getElementById('font');
-FONTS.forEach(f => { const o = document.createElement('option'); o.value = f.id; o.textContent = f.name; fontSel.append(o); });
-fontSel.value = S.font;
-fontSel.addEventListener('change', () => { S.font = fontSel.value; save(); apply(); });
-function seg(el, name, options, current, onPick) {
-  el.innerHTML = options.map(([v, label, swatch]) => `<label><input type="radio" name="${name}" id="${name}-${v}" value="${v}" ${v === current ? 'checked' : ''}><span>${label}${swatch || ''}</span></label>`).join('');
-  el.addEventListener('change', e => onPick(e.target.value));
-}
-seg(document.getElementById('theme'), 'theme', Object.entries(THEMES).map(([id, t]) => [id, t.name, `<span class="dots">${[t.wall[0], t.paper, ...t.inks.slice(0, 4)].map(c => `<i style="background:${c}"></i>`).join('')}</span>`]), S.theme, v => { S.theme = v; save(); apply(); });
-seg(document.getElementById('hand'), 'hand', Object.entries(HAND_NAMES).map(([id, n]) => [id, n]), S.hand, v => { S.hand = v; save(); apply(); });
-seg(document.getElementById('layout'), 'layout', [['above', 'Above'], ['behind', 'Behind'], ['below', 'Below']], S.layout, v => { S.layout = v; save(); placeTitle(); if (S.ink) playInk(); });
-[['fx-ink', 'ink'], ['fx-follow', 'follow'], ['fx-echo', 'echo']].forEach(([id, k]) => {
-  const el = document.getElementById(id); el.checked = !!S[k];
-  el.addEventListener('change', () => { S[k] = el.checked; save(); if (k === 'ink' && S.ink) playInk(); if (k === 'follow') follow(); });
-});
 placeTitle(); if (S.ink) playInk();
 
-const panel = document.getElementById('settings'), gear = document.getElementById('gear');
-const openPanel = open => { panel.hidden = !open; gear.setAttribute('aria-expanded', String(open)); if (open) fontSel.focus(); };
-gear.addEventListener('click', () => openPanel(panel.hidden));
-document.getElementById('close').addEventListener('click', () => { openPanel(false); gear.focus(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) { openPanel(false); gear.focus(); } });
-document.addEventListener('pointerdown', e => { if (!panel.hidden && !panel.contains(e.target) && !gear.contains(e.target)) openPanel(false); });
+/* ---------- private beta sign-up ----------
+   Sign-ups go to a Google Sheet through a small Apps Script, beta-signup.gs. Paste its web app URL
+   below (README: "Private beta sign-ups"). Until it is set, the form explains that sign-up isn't
+   open yet instead of losing the address. */
+const BETA_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzNVbRmAGJXB5NtDUBSD6b2CBLAPOrhplnC5uafuF0lsuWJ2p9Ivmb5IqRXioDmXJkDAw/exec';
+const betaDlg = document.getElementById('beta'), betaForm = document.getElementById('beta-form'), betaEmail = document.getElementById('beta-email');
+const betaMsg = document.getElementById('beta-msg'), betaBtn = betaForm.querySelector('.beta-btn');
+const say = (text, bad) => { betaMsg.textContent = text; betaMsg.classList.toggle('bad', !!bad); };
+function openBeta() {
+  if (betaDlg.open) return;
+  release(true);
+  if (betaDlg.showModal) betaDlg.showModal(); else betaDlg.setAttribute('open', '');
+}
+document.getElementById('beta-close').addEventListener('click', () => betaDlg.close());
+betaDlg.addEventListener('click', e => { if (e.target === betaDlg) betaDlg.close(); }); /* a tap on the dimmed page around the card */
+betaDlg.addEventListener('close', () => {
+  say('');
+  /* drop #beta from the address so the menu link opens it again, and the page underneath stays put */
+  if (location.hash === '#beta') history.replaceState(null, '', location.pathname + location.search + (onAbout ? '#about' : ''));
+});
+betaEmail.addEventListener('input', () => { if (betaMsg.classList.contains('bad')) say(''); });
+betaForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  betaEmail.value = betaEmail.value.trim();
+  if (!betaEmail.checkValidity()) { say('Please enter a valid email address.', true); betaEmail.focus(); return; }
+  if (betaForm.elements._gotcha.value) { betaDlg.classList.add('done'); return; } /* only a bot fills the hidden field */
+  if (!BETA_ENDPOINT) { say('Sign-up opens very soon. Please check back shortly.', true); console.warn('Private beta: set BETA_ENDPOINT in index.html to start collecting sign-ups.'); return; }
+  betaBtn.disabled = true; say('Sending…');
+  try {
+    /* sent as a plain form post, which needs no CORS preflight; the script answers {"ok": true} once the row is saved */
+    const res = await fetch(BETA_ENDPOINT, { method: 'POST', body: new URLSearchParams(new FormData(betaForm)), headers: { Accept: 'application/json' } });
+    const data = res.ok ? await res.json().catch(() => null) : null;
+    if (!data || data.ok !== true) throw new Error(`not saved (HTTP ${res.status})`);
+    say(''); betaForm.reset(); betaDlg.classList.add('done'); document.getElementById('beta-ok').focus();
+  } catch (err) {
+    say('That didn’t go through. Please try again in a moment.', true);
+  } finally {
+    betaBtn.disabled = false;
+  }
+});
 
 /* ---------- views ---------- */
+let onAbout = false;
 function route() {
-  const about = location.hash === '#about';
-  document.getElementById('home').hidden = about; document.getElementById('about-view').hidden = !about;
-  document.getElementById('nav-about').toggleAttribute('aria-current', about); document.getElementById('nav-home').toggleAttribute('aria-current', !about);
-  if (about) document.getElementById('nav-about').setAttribute('aria-current', 'page'); else document.getElementById('nav-home').setAttribute('aria-current', 'page');
+  const beta = location.hash === '#beta';
+  if (!beta) onAbout = location.hash === '#about'; /* the sign-up opens over whichever page is showing */
+  document.getElementById('home').hidden = onAbout; document.getElementById('about-view').hidden = !onAbout;
+  document.getElementById('nav-about').toggleAttribute('aria-current', onAbout); document.getElementById('nav-home').toggleAttribute('aria-current', !onAbout);
+  if (onAbout) document.getElementById('nav-about').setAttribute('aria-current', 'page'); else document.getElementById('nav-home').setAttribute('aria-current', 'page');
+  if (beta) { openBeta(); return; }
+  if (betaDlg.open) betaDlg.close(); /* the Back button closes the sign-up */
   scrollTo(0, 0); /* switching pages starts at the top, so the menu stays in view on short screens */
 }
 window.addEventListener('hashchange', route);
 document.getElementById('nav-home').addEventListener('click', e => { e.preventDefault(); if (location.hash) location.hash = ''; route(); });
+/* the menu link: open the sign-up even when the address already ends in #beta */
+document.getElementById('nav-beta').addEventListener('click', e => { if (location.hash === '#beta') { e.preventDefault(); openBeta(); } });
 route();
 
-Promise.all(FONTS.map(f => document.fonts.load(`${f.style} ${f.weight} 40px ${f.css.split(',')[0]}`))).catch(() => {}).then(apply);
 apply();
 requestAnimationFrame(tick);
 </script>
